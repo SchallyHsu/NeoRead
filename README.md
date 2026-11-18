@@ -6,6 +6,12 @@
 
 <p align="center"><b>简体中文</b> | <a href="README.en.md">English</a> | <a href="https://neoread.app/">官网</a></p>
 
+## 关于这个分支
+
+NeoRead 阅读器由 [cynicalight 和上游贡献者](https://github.com/cynicalight/NeoRead) 开发。本仓库是 **SchallyHsu 维护的非官方整合分支**。Agent 通信和项目归档复用了 [Zotero Agent 中文版](https://github.com/SchallyHsu/zotero-agent-zh-CN) 的实现，其插件源自 [Zotero MCP](https://github.com/54yyyu/zotero-mcp)。
+
+本分支将 Claude Code、Codex、Antigravity、DeepSeek Harness 接入阅读侧栏，并添加了通过自有 WebDAV 主机同步 PDF、EPUB 和聊天的功能。安装整合版请使用下方的源码构建步骤。[双机配置指南](docs/native-agents-webdav.zh-CN.md) · [原创与来源声明](NOTICE.md)
+
 一个本地优先的 EPUB / PDF AI 阅读器，用于阅读电子书与论文、对照译文、记录批注，以及结合原文向 AI 提问。
 
 <p align="center">
@@ -14,7 +20,7 @@
 
 NeoRead 以 EPUB 和 PDF 为两种核心文档格式，将图书库与论文库分开管理，提供目录、搜索、双语对照、批注与 AI 助读。文档、阅读进度和笔记保存在本机。AI 由内置 Pi 运行。用户可以登录 ChatGPT、Claude 或 Kimi Code，也可以使用厂商 API Key 或自定义兼容接口。
 
-可从[官网](https://neoread.app/)了解项目，或在 [GitHub Releases](https://github.com/cynicalight/NeoRead/releases) 下载安装包：macOS（Apple Silicon）DMG 与 Windows x64 EXE。Intel Mac 安装包暂停构建，Linux 不提供安装包，也可以从源码运行。安装包没有受系统信任的开发者证书，首次运行可能需要允许系统安全提示。流程与验证范围见[安装包与发版说明](docs/releasing.md)。
+原项目提供 macOS（Apple Silicon）DMG 和 Windows x64 EXE 安装包。[原项目官网](https://neoread.app/) · [上游官方 Releases](https://github.com/cynicalight/NeoRead/releases)。Intel Mac 安装包暂停构建，Linux 不提供安装包，也可以从源码运行。安装包没有受系统信任的开发者证书，首次运行可能需要允许系统安全提示。流程与验证范围见[安装包与发版说明](docs/releasing.md)。
 
 ## 功能
 
@@ -91,7 +97,7 @@ NeoRead 以 EPUB 和 PDF 为两种核心文档格式，将图书库与论文库�
 需要 **Node.js 22+、pnpm 10.30.3 和 Go 1.26.5+**。
 
 ```sh
-git clone https://github.com/cynicalight/NeoRead.git
+git clone https://github.com/SchallyHsu/NeoRead.git
 cd NeoRead
 pnpm install
 pnpm desktop
@@ -123,7 +129,7 @@ Pi worker 在私有临时目录运行，通过 NeoRead 提供的工具按权限�
 
 ## 本地数据
 
-原文件存放在文件系统，文档信息、进度、批注、对话与设置存放在 SQLite。NeoRead 没有内置云同步。论文元数据查找和在线导入会访问公开的论文服务。自动补全先读取 PDF 前两页的线索，使用 DOI、arXiv 编号及可用标题查找；仍无可靠标题时，可将首页最多 2,000 个字符发给文本模型生成标题建议，并以不同的建议标题额外查询论文信息。仅当 API 补全后仍无出处，且主 Agent 与联网搜索已配置可用时，最后将论文标题、作者和已有标识符交给 Agent 联网查找出处全称与简称；这个出处检索步骤不发送正文或笔记。已有出处不会因缩写转换或评级未命中而调用 Agent。自动补全可在设置中关闭，手动查找仍可执行。期刊与会议评级只在配置 easyScholar 密钥后查询，并在本机缓存结果。
+原文件存放在文件系统，文档信息、进度、批注、对话与设置存放在 SQLite。本分支可选用 WebDAV 同步 PDF、EPUB 与聊天记录。论文元数据查找和在线导入会访问公开的论文服务。自动补全先读取 PDF 前两页的线索，使用 DOI、arXiv 编号及可用标题查找；仍无可靠标题时，可将首页最多 2,000 个字符发给文本模型生成标题建议，并以不同的建议标题额外查询论文信息。仅当 API 补全后仍无出处，且主 Agent 与联网搜索已配置可用时，最后将论文标题、作者和已有标识符交给 Agent 联网查找出处全称与简称；这个出处检索步骤不发送正文或笔记。已有出处不会因缩写转换或评级未命中而调用 Agent。自动补全可在设置中关闭，手动查找仍可执行。期刊与会议评级只在配置 easyScholar 密钥后查询，并在本机缓存结果。
 
 | 运行方式                       | 数据目录                                                                                   |
 | ------------------------------ | ------------------------------------------------------------------------------------------ |

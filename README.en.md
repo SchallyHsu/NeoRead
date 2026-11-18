@@ -6,6 +6,12 @@
 
 <p align="center"><a href="README.md">简体中文</a> | <b>English</b> | <a href="https://neoread.app/">Website</a></p>
 
+## About this fork
+
+[cynicalight and the upstream contributors](https://github.com/cynicalight/NeoRead) developed the NeoRead reader. **SchallyHsu maintains this unofficial integration fork**. The agent protocol and native project adapters come from [Zotero Agent zh-CN](https://github.com/SchallyHsu/zotero-agent-zh-CN), a derivative of the [Zotero MCP plugin](https://github.com/54yyyu/zotero-mcp).
+
+This fork connects Claude Code, Codex, Antigravity and DeepSeek Harness to the reading sidebar and adds PDF, EPUB and chat sync through your own WebDAV server. Follow the source build instructions below to run the integrated version. [Two-device setup (Chinese)](docs/native-agents-webdav.zh-CN.md) · [Credits and provenance](NOTICE.md)
+
 A local-first EPUB / PDF reader for books and papers, with side-by-side translations, annotations, and AI assistance grounded in the text you are reading.
 
 <p align="center">
@@ -17,7 +23,7 @@ A local-first EPUB / PDF reader for books and papers, with side-by-side translat
 
 NeoRead treats EPUB and PDF as core document formats. It separates books and papers into two libraries and shares contents, search, bilingual reading, annotation, and chat tools across both. Documents, reading progress, and notes stay on your machine. The built-in Pi runtime supports ChatGPT, Claude, and Kimi Code account connections, provider API keys, and custom compatible endpoints.
 
-Download installers from [GitHub Releases](https://github.com/cynicalight/NeoRead/releases): DMG for Apple Silicon Macs and EXE for Windows x64. Intel Mac builds are paused and Linux installers are not provided; you can also run from source. Installers have no trusted developer certificate and may require approval in your system security settings. See the [packaging and release guide (Chinese)](docs/releasing.md) for the workflow and validation scope.
+Download installers for the upstream reader from [the original NeoRead releases](https://github.com/cynicalight/NeoRead/releases): DMG for Apple Silicon Macs and EXE for Windows x64. Intel Mac builds are paused and Linux installers are not provided; you can also run from source. Installers have no trusted developer certificate and may require approval in your system security settings. See the [packaging and release guide (Chinese)](docs/releasing.md) for the workflow and validation scope.
 
 ## Features
 
@@ -77,7 +83,7 @@ Captured from the app.
 Requires **Node.js 22+, pnpm 10.30.3, and Go 1.26.5+**.
 
 ```sh
-git clone https://github.com/cynicalight/NeoRead.git
+git clone https://github.com/SchallyHsu/NeoRead.git
 cd NeoRead
 pnpm install
 pnpm desktop
@@ -109,7 +115,7 @@ Pi workers run in private temporary directories and access documents through Neo
 
 ## Local data
 
-Original files are stored on the filesystem. Document metadata, progress, annotations, conversations, and settings are stored in SQLite. NeoRead has no built-in cloud sync. Paper metadata lookup and online imports contact public paper services. Automatic completion first reads clues from the PDF's first two pages and searches using DOI/arXiv identifiers and available titles. If no reliable title is available, it can send up to 2,000 characters from the first page to the text model for a suggested title, then search a different suggested title as well. Only when metadata APIs still leave the venue empty, and a primary Agent and web search are configured and available, a final Agent lookup sends the title, authors, and existing identifiers to find the venue's full and short names; this venue lookup does not send document text or notes. An existing venue never triggers an Agent just to convert a name or recover missing ranks. Automatic completion can be turned off in Settings while manual lookup remains available. Journal and conference ranks are queried only after an easyScholar key is configured and are cached locally.
+Original files are stored on the filesystem. Document metadata, progress, annotations, conversations, and settings are stored in SQLite. This fork supports optional WebDAV sync for PDF and EPUB files and chat transcripts. Paper metadata lookup and online imports contact public paper services. Automatic completion first reads clues from the PDF's first two pages and searches using DOI/arXiv identifiers and available titles. If no reliable title is available, it can send up to 2,000 characters from the first page to the text model for a suggested title, then search a different suggested title as well. Only when metadata APIs still leave the venue empty, and a primary Agent and web search are configured and available, a final Agent lookup sends the title, authors, and existing identifiers to find the venue's full and short names; this venue lookup does not send document text or notes. An existing venue never triggers an Agent just to convert a name or recover missing ranks. Automatic completion can be turned off in Settings while manual lookup remains available. Journal and conference ranks are queried only after an easyScholar key is configured and are cached locally.
 
 | Mode                                | Data directory                                                                                   |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
