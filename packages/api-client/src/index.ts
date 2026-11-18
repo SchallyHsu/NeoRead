@@ -194,7 +194,12 @@ export type PaperRefreshProgress =
 export type ChapterTranslationStatus =
   paths["/api/documents/{id}/translations/chapter-status"]["post"]["responses"]["200"]["content"]["application/json"];
 
+export interface NativeAgentSettings {
+  provider:string; projectName:string; directory:string; executables:Record<string,string>;
+}
 export const api = {
+  nativeAgent:()=>request<NativeAgentSettings>("/api/native-agent"),
+  saveNativeAgent:(config:NativeAgentSettings)=>request<NativeAgentSettings>("/api/native-agent",{method:"PUT",body:JSON.stringify(config)}),
   paperRefreshStatus: () =>
     request<PaperRefreshProgress>("/api/diagnostics/paper-refresh"),
   startPaperRefresh: () =>

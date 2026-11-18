@@ -59,7 +59,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "缺少 context 字段")
 		return
 	}
-	if !validAgent(req.Provider) {
+	if !validAgent(req.Provider) && !nativeProvider(req.Provider) {
 		fail(w, 400, "未知 AI 服务")
 		return
 	}

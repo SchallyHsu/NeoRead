@@ -129,7 +129,7 @@ func (s *Server) createChatSession(w http.ResponseWriter, r *http.Request) {
 		req.Title = "新会话"
 	}
 	title, err := metadataText(json.RawMessage(jsonText(req.Title)), 80, false)
-	if err != nil || !validAgent(req.Provider) {
+	if err != nil || (!validAgent(req.Provider) && !nativeProvider(req.Provider)) {
 		fail(w, 400, "会话名称或后端无效")
 		return
 	}
@@ -181,7 +181,7 @@ func (s *Server) updateChatSession(w http.ResponseWriter, r *http.Request) {
 		v.Title = title
 	}
 	if req.Provider != nil {
-		if !validAgent(*req.Provider) {
+		if !validAgent(*req.Provider) && !nativeProvider(*req.Provider) {
 			fail(w, 400, "后端无效")
 			return
 		}

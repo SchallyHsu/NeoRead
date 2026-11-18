@@ -70,6 +70,7 @@ await cp(
 );
 // Keep dependencies intact while avoiding thousands of individual install writes.
 // Native modules need real paths; Electron resolves unpacked archive entries.
+await cp(join(root, "apps/agent/dist/native"), join(staging, "native"), {recursive:true});
 const agentDirectory = join(staging, "agent");
 const agentArchive = join(staging, "agent.asar");
 const archiveStarted = Date.now();

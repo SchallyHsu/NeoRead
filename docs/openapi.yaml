@@ -4,6 +4,7 @@
   "security": [{ "session": [] }],
   "paths":
     {
+      "/api/native-agent": {"get": {"summary": "Read native reader agent settings", "responses": {"200": {"description": "Settings", "content": {"application/json": {"schema": {"type": "object", "required": ["provider", "projectName", "directory", "executables"], "properties": {"provider": {"type": "string"}, "projectName": {"type": "string"}, "directory": {"type": "string"}, "executables": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}}}, "put": {"summary": "Set native reader agent and project", "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["provider", "projectName", "directory", "executables"], "properties": {"provider": {"type": "string"}, "projectName": {"type": "string"}, "directory": {"type": "string"}, "executables": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}, "responses": {"200": {"description": "Saved settings", "content": {"application/json": {"schema": {"type": "object", "required": ["provider", "projectName", "directory", "executables"], "properties": {"provider": {"type": "string"}, "projectName": {"type": "string"}, "directory": {"type": "string"}, "executables": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}}}},
       "/api/documents/{id}/navigation":
         {
           "get":

@@ -1,0 +1,1 @@
+ACP client, session handling, process adapter and native project helpers adapted from SchallyHsu/zotero-agent-zh-CN at 457042a and its upstream 54yyyu/zotero-mcp. See LICENSE (AGPL-3.0). NeoRead adds the worker host and Windows process adaptation.

@@ -103,6 +103,7 @@ import { ModelSelector } from "./ModelSelector";
 import { SourceReferences } from "./SourceReferences";
 import { ChatSession } from "./chat/chat-session";
 import { getChatSession } from "./chat/session-registry";
+import { nativeAgentLabels } from "./NativeAgentSettings";
 import { SessionPicker } from "./chat/SessionPicker";
 import { AssistantPanel } from "./chat/AssistantPanel";
 import { ImagePreview, imageLabel } from "./ImagePreview";
@@ -410,8 +411,15 @@ export function Workspace({
   }
   const currentSession =
     sessions.find((s) => s.id === preferred) ?? sessions[0];
-  const provider = aiConfig?.primary ?? "";
-  const webSearch = webSearchEnabled(provider, aiConfig?.webSearch);
+  const [nativeProvider,setNativeProvider] = useState("");
+  useEffect(()=>{
+    let active=true;
+    const refresh=()=>void api.nativeAgent?.().then(cfg=>{if(active)setNativeProvider(cfg.provider)}).catch(()=>{});
+    refresh();window.addEventListener("native-agent-changed",refresh);
+    return ()=>{active=false;window.removeEventListener("native-agent-changed",refresh)};
+  },[]);
+  const provider = nativeProvider || aiConfig?.primary || "";
+  const webSearch = !nativeProvider && webSearchEnabled(provider, aiConfig?.webSearch);
   const sessionListSerial = useRef(0);
   const refreshSessions = useCallback(async () => {
     const serial = ++sessionListSerial.current;
@@ -1758,11 +1766,11 @@ export function Workspace({
                     }}
                   />
                   <div className="compose-footer">
-                    <ModelSelector
+                    {nativeProvider ? <Button variant="ghost" size="sm" onClick={onSettings}>{nativeAgentLabels[nativeProvider]}</Button> : <ModelSelector
                       key={provider}
                       disabled={sending || !currentSession}
                       onSettings={onSettings}
-                    />
+                    />}
                     {sending ? (
                       <Button
                         size="icon-sm"

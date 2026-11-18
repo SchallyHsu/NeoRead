@@ -47,6 +47,7 @@ type Capability struct {
 	Fingerprint         string `json:"-"`
 }
 type AIConfig struct {
+	native        *nativeSettings
 	piConnections map[string]APIConnection
 	WebSearch     *WebSearchConfig             `json:"webSearch,omitempty"`
 	Primary       string                       `json:"primary"`

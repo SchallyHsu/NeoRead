@@ -116,7 +116,7 @@ func (s *Server) streamChat(ctx context.Context, cancel context.CancelFunc, w ht
 		return
 	}
 	contextWarning := ""
-	if in.Chat != nil && (len(in.images()) == 0 || in.Chat.SessionID != "") {
+	if config.native == nil && in.Chat != nil && (len(in.images()) == 0 || in.Chat.SessionID != "") {
 		d, docErr := s.Store.Document(documentID)
 		if docErr == nil {
 			if _, fileErr := os.Stat(s.Store.File(d)); fileErr == nil {
@@ -163,7 +163,7 @@ func (s *Server) streamChat(ctx context.Context, cancel context.CancelFunc, w ht
 	}
 	service.usageSink = s.processingUsageSink(documentID, "chat", requestID)
 	citations := &webCitationStream{normalize: func(text string) string { return in.Chat.normalizeWebCitations(text) }}
-	result, err := service.Generate(ctx, in, true, func(e ProviderEvent) error {
+	emit := func(e ProviderEvent) error {
 		if e.Reasoning != "" {
 			return out.send("reasoning", map[string]string{"text": e.Reasoning})
 		}
@@ -188,7 +188,16 @@ func (s *Server) streamChat(ctx context.Context, cancel context.CancelFunc, w ht
 			firstText = time.Now()
 		}
 		return out.send("delta", map[string]string{"text": text})
-	})
+	}
+	var result AIResult
+	var err error
+	if config.native != nil {
+		result, err = s.nativeAnswer(ctx, *config.native, in, emit, func(message string) error {
+			return out.send("activity", map[string]string{"phase": "project", "message": message})
+		})
+	} else {
+		result, err = service.Generate(ctx, in, true, emit)
+	}
 	if err == nil && in.Chat != nil && in.Chat.WebSearch {
 		if tail := citations.finish(); tail != "" {
 			err = out.send("delta", map[string]string{"text": tail})

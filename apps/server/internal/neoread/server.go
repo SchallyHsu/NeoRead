@@ -222,6 +222,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/documents/{id}/messages", s.messages)
 	mux.HandleFunc("GET /api/documents/{id}/messages/{message}/sources/{source}", s.validateChatEvidence)
 	mux.HandleFunc("POST /api/documents/{id}/chat", s.chat)
+	mux.HandleFunc("GET /api/native-agent", s.nativeConfig)
+	mux.HandleFunc("PUT /api/native-agent", s.nativeConfig)
 	mux.HandleFunc("GET /api/documents/{id}/chat-sessions", s.listChatSessions)
 	mux.HandleFunc("POST /api/documents/{id}/chat-sessions", s.createChatSession)
 	mux.HandleFunc("PATCH /api/documents/{id}/chat-sessions/{session}", s.updateChatSession)
