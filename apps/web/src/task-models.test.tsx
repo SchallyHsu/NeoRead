@@ -260,3 +260,23 @@ it("uses the CLI's own default and saves and resets its model without changing a
   expect(config.models).toEqual({ claude: "opus", [provider]: "" });
   expect(config.primary).toBe("claude");
 });
+
+it("keeps separate native chat and translation effort per effective model", async () => {
+  const provider = "native:deepseek-harness";
+  config.nativeAgent = { provider, executables: {}, projectName: "Reading", directory: "" };
+  config.models[provider] = "opus";
+  useReaderStore.setState({ aiConfig: config });
+  vi.mocked(api.agentModels).mockImplementation(async (_provider, _signal, _refresh, _cached, selected) =>
+    models.map(m => ({...m, nativeEfforts: m.id === selected ? [{id:"off",name:"Off"},{id:"max",name:"Max"}] : []})));
+  await act(async () => root.render(<><NativeChatModel provider={provider} disabled={false} discover /><NativeChatModel task="translation" provider={provider} disabled={false} discover /></>));
+  expect(trigger("DeepSeek Harness 翻译模型").textContent).toContain("跟随问答 · Opus");
+  await choose("DeepSeek Harness 问答推理强度","Off");
+  await choose("DeepSeek Harness 翻译推理强度","Max");
+  expect(config.efforts?.[provider]).toEqual({opus:"off"});
+  expect(config.translationEfforts?.[provider]).toEqual({opus:"max"});
+  await choose("DeepSeek Harness 翻译模型","Sonnet");
+  expect(config.translationModels?.[provider]).toBe("sonnet");
+  expect(trigger("DeepSeek Harness 翻译推理强度").textContent).toContain("自动强度");
+  await choose("DeepSeek Harness 翻译模型","跟随问答模型");
+  expect(trigger("DeepSeek Harness 翻译推理强度").textContent).toContain("Max");
+});

@@ -128,10 +128,10 @@ func (s *Server) lockNativeStartup(backend string) func() {
 	return sync.OnceFunc(lock.Unlock)
 }
 
-func (s *Server) nativeModelCatalog(ctx context.Context, provider string) ([]AgentModel, error) {
+func (s *Server) nativeModelCatalog(ctx context.Context, provider, model string) ([]AgentModel, error) {
 	backend := strings.TrimPrefix(provider, "native:")
 	executable := s.aiConfig().NativeAgent.Executables[provider]
-	return s.cachedCatalog(ctx, provider+"\x00"+executable, func(ctx context.Context) ([]AgentModel, error) {
+	return s.cachedCatalog(ctx, provider+":"+jsonText([]string{executable, model}), func(ctx context.Context) ([]AgentModel, error) {
 		release := s.lockNativeStartup(backend)
 		defer release()
 		if err := ctx.Err(); err != nil {
@@ -139,7 +139,7 @@ func (s *Server) nativeModelCatalog(ctx context.Context, provider string) ([]Age
 		}
 		runID := id()
 		result, err := runPiOperation(ctx, s.Store.Root, "native-catalog", runID, map[string]string{
-			"runId": runID, "backend": backend, "executable": executable,
+			"runId": runID, "backend": backend, "executable": executable, "model": model,
 			"bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend),
 		}, false, func(e piEvent) error {
 			if e.Type == "activity" {
@@ -158,7 +158,7 @@ func (s *Server) nativeModelCatalog(ctx context.Context, provider string) ([]Age
 	})
 }
 
-func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, model string, in AIInput, emit func(ProviderEvent) error, notice func(string) error) (AIResult, error) {
+func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, model, effort string, in AIInput, emit func(ProviderEvent) error, notice func(string) error) (AIResult, error) {
 	chat := in.Chat
 	project := cfg.project(cfg.Provider)
 	cfg.ProjectName = project.Name
@@ -185,23 +185,8 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, model str
 		images = append(images, map[string]string{"mime": "image/png", "data": base64.StdEncoding.EncodeToString(data)})
 	}
 	backend := strings.TrimPrefix(cfg.Provider, "native:")
-	req := map[string]any{"runId": chat.piRunID, "backend": backend, "model": model, "cwd": cwd, "projectName": cfg.ProjectName, "title": session.Title, "resume": c.NativeID, "projectId": c.NativeProjectID, "prompt": prompt, "images": images, "executable": cfg.Executables[cfg.Provider], "bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend)}
-	release := s.lockNativeStartup(backend)
-	defer release()
-	if err := ctx.Err(); err != nil {
-		return AIResult{}, err
-	}
-	done, err := runPiOperation(ctx, s.Store.Root, "native", chat.piRunID, req, false, func(e piEvent) error {
-		switch e.Type {
-		case "activity":
-			release()
-		case "delta":
-			return emit(ProviderEvent{Text: e.Text})
-		case "reasoning":
-			return emit(ProviderEvent{Reasoning: e.Text})
-		}
-		return nil
-	}, nil)
+	req := map[string]any{"runId": chat.piRunID, "backend": backend, "model": model, "effort": effort, "cwd": cwd, "projectName": cfg.ProjectName, "title": session.Title, "resume": c.NativeID, "projectId": c.NativeProjectID, "prompt": prompt, "images": images, "executable": cfg.Executables[cfg.Provider], "bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend)}
+	done, err := s.nativeTurn(ctx, backend, "native", chat.piRunID, req, emit)
 	if err != nil {
 		return AIResult{}, err
 	}
@@ -261,4 +246,51 @@ func (s *Server) archiveProjectTurn(p agentProject, provider string, chat *chatI
 	}
 	text := fmt.Sprintf("# %s · %s\n\n## 提问\n\n%s\n\n## 回答\n\n%s\n", chat.Title, session.Title, chat.Question, answer)
 	return atomicFile(filepath.Join(dir, sourceKey(chat.piRunID)[:24]+".md"), []byte(text))
+}
+
+// Chat and translation use the same startup lock and streaming protocol.
+func (s *Server) nativeTurn(ctx context.Context, backend, operation, runID string, req map[string]any, emit func(ProviderEvent) error) (piEvent, error) {
+	release := s.lockNativeStartup(backend)
+	defer release()
+	if err := ctx.Err(); err != nil {
+		return piEvent{}, err
+	}
+	return runPiOperation(ctx, s.Store.Root, operation, runID, req, false, func(e piEvent) error {
+		switch e.Type {
+		case "activity":
+			release()
+		case "delta":
+			return emit(ProviderEvent{Text: e.Text})
+		case "reasoning":
+			return emit(ProviderEvent{Reasoning: e.Text})
+		}
+		return nil
+	}, nil)
+}
+
+type nativeTranslationAdapter struct {
+	server                              *Server
+	provider, executable, model, effort string
+}
+
+func (a nativeTranslationAdapter) Stream(ctx context.Context, request GenerateRequest, emit func(ProviderEvent) error) (GenerateResult, error) {
+	backend := strings.TrimPrefix(a.provider, "native:")
+	runID := id()
+	result, err := a.server.nativeTurn(ctx, backend, "native-translation", runID, map[string]any{
+		"runId": runID, "backend": backend, "executable": a.executable, "bridgeDir": filepath.Join(a.server.Store.Root, "native-bridges", backend),
+		"model": a.model, "effort": a.effort, "prompt": request.Input.Prompt, "systemPrompt": request.Input.SystemPrompt,
+	}, emit)
+	if err != nil {
+		return GenerateResult{}, err
+	}
+	if u := result.TurnUsage; u != nil {
+		m := ModelTokens{Model: u.Model}
+		if u.Input != nil && u.Output != nil {
+			m.Tokens = &TokenCounts{InputTokens: *u.Input, OutputTokens: *u.Output, TotalTokens: *u.Input + *u.Output}
+		}
+		if err := emit(ProviderEvent{Metrics: []ModelTokens{m}}); err != nil {
+			return GenerateResult{}, err
+		}
+	}
+	return GenerateResult{Text: result.Text, FinishReason: "stop"}, nil
 }

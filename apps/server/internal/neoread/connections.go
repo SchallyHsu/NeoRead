@@ -47,13 +47,14 @@ type Capability struct {
 	Fingerprint         string `json:"-"`
 }
 type AIConfig struct {
-	NativeAgent   *nativeSettings `json:"nativeAgent,omitempty"`
-	native        *nativeSettings
-	piConnections map[string]APIConnection
-	WebSearch     *WebSearchConfig             `json:"webSearch,omitempty"`
-	Primary       string                       `json:"primary"`
-	Models        map[string]string            `json:"models"`
-	Efforts       map[string]map[string]string `json:"efforts,omitempty"`
+	translationFrozen bool
+	NativeAgent       *nativeSettings `json:"nativeAgent,omitempty"`
+	native            *nativeSettings
+	piConnections     map[string]APIConnection
+	WebSearch         *WebSearchConfig             `json:"webSearch,omitempty"`
+	Primary           string                       `json:"primary"`
+	Models            map[string]string            `json:"models"`
+	Efforts           map[string]map[string]string `json:"efforts,omitempty"`
 	// Translation choices are independent of chat. An empty model means
 	// NeoRead picks the fast tier from the live catalog.
 	TranslationModels  map[string]string            `json:"translationModels,omitempty"`

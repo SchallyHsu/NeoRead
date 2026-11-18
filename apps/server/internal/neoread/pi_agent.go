@@ -79,7 +79,7 @@ var piRuntimePaths = func() (node, worker string, err error) {
 }
 
 func runPiOperation(ctx context.Context, root, operation, runID string, request any, durable bool, event func(piEvent) error, tool func(string, json.RawMessage) ([]any, error)) (piEvent, error) {
-	nativeOperation := operation == "native" || operation == "native-quota" || operation == "native-catalog"
+	nativeOperation := operation == "native" || operation == "native-translation" || operation == "native-quota" || operation == "native-catalog"
 	node, worker, err := piRuntimePaths()
 	if nativeOperation {
 		node = "node"
@@ -167,7 +167,7 @@ func runPiOperation(ctx context.Context, root, operation, runID string, request 
 		}
 		switch e.Type {
 		case "delta":
-			if operation != "native" || event == nil {
+			if (operation != "native" && operation != "native-translation") || event == nil {
 				return piEvent{}, generationError(ErrorProtocol, "无效的原生输出")
 			}
 			if err = event(e); err != nil {
@@ -218,7 +218,7 @@ func runPiOperation(ctx context.Context, root, operation, runID string, request 
 				}
 			}
 			if nativeOperation {
-				hint := map[string]string{"model": "该 Agent 无法切换到所选模型，请重新选择问答模型或跟随 Agent 会话", "executable": "找不到 Agent 程序，请检查设置中的路径和 Node.js 安装", "bridge": "ACP 桥接组件安装失败，请检查 npm 和网络连接", "handshake": "原生 Agent 握手失败，请检查 CLI 登录和版本", "images": "该 Agent 未声明图片输入能力", "project": "无法恢复原生项目，请检查客户端和项目目录"}[e.Code]
+				hint := map[string]string{"effort":"当前模型无法使用所选推理强度，请在设置中重新选择", "model": "该 Agent 无法切换到所选模型，请重新选择问答模型或跟随 Agent 会话", "executable": "找不到 Agent 程序，请检查设置中的路径和 Node.js 安装", "bridge": "ACP 桥接组件安装失败，请检查 npm 和网络连接", "handshake": "原生 Agent 握手失败，请检查 CLI 登录和版本", "images": "该 Agent 未声明图片输入能力", "project": "无法恢复原生项目，请检查客户端和项目目录"}[e.Code]
 				if hint == "" {
 					hint = "原生 Agent 未正常完成回答，请在对应客户端检查模型配置和账号"
 				}

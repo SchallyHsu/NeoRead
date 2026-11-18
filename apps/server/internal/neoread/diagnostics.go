@@ -177,7 +177,8 @@ func (s *Server) diagnosticSettings() map[string]any {
 		result[item.key] = safe
 	}
 	config := s.aiConfig()
-	result["ai"] = map[string]any{"provider": config.Primary, "chatModel": config.Models[config.Primary], "translationModel": config.TranslationModels[config.Primary]}
+	provider := translationProvider(config)
+	result["ai"] = map[string]any{"provider": provider, "chatModel": config.Models[provider], "translationModel": translationModel(config, provider)}
 	return result
 }
 func (s *Server) exportDiagnostics(w http.ResponseWriter, r *http.Request) {

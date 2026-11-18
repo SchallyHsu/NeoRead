@@ -32,7 +32,7 @@ export const efforts: ReasoningEffort[] = ["low", "medium", "high", "max"];
 // the controlled value is a one-element array. Keyboard input can emit an array.
 const effortFromSlider = (value: number | readonly number[]) =>
   efforts[typeof value === "number" ? value : value[0]!]!;
-export const effortLabel = (value: ReasoningEffort) =>
+export const effortLabel = (value: string) =>
   value[0]!.toUpperCase() + value.slice(1);
 // Use the same GPT label before and after the SDK catalog arrives.
 export const modelDisplayName = (id: string, name = id) =>
@@ -149,7 +149,7 @@ export function ModelSelector({
   const fixedEffort =
     effortInfo?.mode === "fixed" || effortInfo?.mode === "unknown";
   const currentEffort =
-    config?.efforts?.[provider]?.[configuredModel] ?? "medium";
+    efforts.find((level) => level === config?.efforts?.[provider]?.[configuredModel]) ?? "medium";
   const effort = draftEffort ?? currentEffort;
   useEffect(() => {
     setDraftEffort(null);

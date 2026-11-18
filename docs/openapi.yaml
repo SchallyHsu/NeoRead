@@ -3338,6 +3338,7 @@
                         "enum": ["codex", "claude", "kimi", "api", "native:codex", "native:claude-code", "native:antigravity", "native:deepseek-harness"],
                       },
                   },
+                  { "in": "query", "name": "model", "description": "For native agents, report reasoning levels for this model.", "schema": { "type": "string", "maxLength": 512 } },
                   {
                     "in": "query",
                     "name": "refresh",
@@ -7116,6 +7117,7 @@
                       "description": "Provider-reported context capacity; omitted when unavailable",
                     },
                   "maxOutputTokens": { "type": "integer" },
+                  "nativeEfforts": { "type":"array", "items": { "type":"object", "required":["id","name"], "properties":{"id":{"type":"string"},"name":{"type":"string"}} } },
                   "effortInfo":
                     {
                       "type": "object",
@@ -7193,7 +7195,7 @@
             "status":{"type":"string"},"checkedAt":{"type":"number"},"retryAt":{"type":"number"},"plan":{"type":"string"},"message":{"type":"string"},
             "windows":{"type":"array","items":{"type":"object","required":["id","label","usedPercent"],"properties":{"id":{"type":"string"},"label":{"type":"string"},"usedPercent":{"type":"number"},"resetsAt":{"type":"number"}}}},
             "balances":{"type":"array","items":{"type":"object","required":["label","remaining"],"properties":{"label":{"type":"string"},"remaining":{"type":"string"},"currency":{"type":"string"}}}}}},
-          "TurnUsage":{"type":"object","properties":{"model":{"type":"string"},"provider":{"type":"string"},"estimated":{"type":"boolean"},"inputTokens":{"type":"number"},"outputTokens":{"type":"number"},"contextUsed":{"type":"number"},"contextSize":{"type":"number"},"costUsd":{"type":"number"}}},
+          "TurnUsage":{"type":"object","properties":{"effort":{"type":"string"},"model":{"type":"string"},"provider":{"type":"string"},"estimated":{"type":"boolean"},"inputTokens":{"type":"number"},"outputTokens":{"type":"number"},"contextUsed":{"type":"number"},"contextSize":{"type":"number"},"costUsd":{"type":"number"}}},
           "NativeAgentSettings": {
             "type":"object","required":["provider","projectName","directory","executables"],
             "properties":{"provider":{"type":"string"},"projectName":{"type":"string"},"directory":{"type":"string"},
@@ -7218,12 +7220,12 @@
                   "efforts":
                     {
                       "type": "object",
-                      "description": "NeoRead effort by provider and model ID. Defaults to medium; adapted to SDK-native values on invocation.",
+                      "description": "Reasoning effort by provider and model. Native connections use the exact level reported by the CLI; an empty value follows its default.",
                       "additionalProperties":
                         {
                           "type": "object",
                           "additionalProperties":
-                            { "$ref": "#/components/schemas/ReasoningEffort" },
+                            { "type": "string" },
                         },
                     },
                   "translationModels":
@@ -7241,12 +7243,12 @@
                   "translationEfforts":
                     {
                       "type": "object",
-                      "description": "Translation effort by provider and model ID. Defaults to medium.",
+                      "description": "Translation effort by provider and effective model ID. Native connections use the CLI level or its default.",
                       "additionalProperties":
                         {
                           "type": "object",
                           "additionalProperties":
-                            { "$ref": "#/components/schemas/ReasoningEffort" },
+                            { "type": "string" },
                         },
                     },
                   "visionModels":

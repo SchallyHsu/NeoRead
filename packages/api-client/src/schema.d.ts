@@ -3224,6 +3224,8 @@ export interface paths {
             parameters: {
                 query: {
                     provider: "codex" | "claude" | "kimi" | "api" | "native:codex" | "native:claude-code" | "native:antigravity" | "native:deepseek-harness";
+                    /** @description For native agents, report reasoning levels for this model. */
+                    model?: string;
                     /** @description Reload an expired catalog from the Settings picker. Fresh snapshots are reused. */
                     refresh?: boolean;
                     /** @description Read the existing snapshot, including expired data, without starting discovery. */
@@ -5829,6 +5831,10 @@ export interface components {
             /** @description Provider-reported context capacity; omitted when unavailable */
             contextWindow?: number;
             maxOutputTokens?: number;
+            nativeEfforts?: {
+                id: string;
+                name: string;
+            }[];
             effortInfo?: {
                 /** @enum {string} */
                 mode: "levels" | "budget" | "fixed" | "unknown";
@@ -5882,6 +5888,7 @@ export interface components {
             }[];
         };
         TurnUsage: {
+            effort?: string;
             model?: string;
             provider?: string;
             estimated?: boolean;
@@ -5913,10 +5920,10 @@ export interface components {
             models: {
                 [key: string]: string;
             };
-            /** @description NeoRead effort by provider and model ID. Defaults to medium; adapted to SDK-native values on invocation. */
+            /** @description Reasoning effort by provider and model. Native connections use the exact level reported by the CLI; an empty value follows its default. */
             efforts?: {
                 [key: string]: {
-                    [key: string]: components["schemas"]["ReasoningEffort"];
+                    [key: string]: string;
                 };
             };
             /** @description Translation model by provider. Empty uses the provider's fast-tier recommendation. */
@@ -5925,10 +5932,10 @@ export interface components {
             };
             /** @description Translation style and terminology preferences. Empty resets to default; omission preserves the saved value. Does not replace source-alignment or output-format rules. */
             translationPrompt?: string;
-            /** @description Translation effort by provider and model ID. Defaults to medium. */
+            /** @description Translation effort by provider and effective model ID. Native connections use the CLI level or its default. */
             translationEfforts?: {
                 [key: string]: {
-                    [key: string]: components["schemas"]["ReasoningEffort"];
+                    [key: string]: string;
                 };
             };
             /** @description Image-input model by provider; used by the api agent only. Empty uses the recommended model that passed the vision check. */

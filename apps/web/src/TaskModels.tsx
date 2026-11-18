@@ -42,7 +42,7 @@ const fields = {
 export function taskChoice(config: AIConfig, task: ModelTask) {
   const provider = config.primary;
   const model = config[fields[task].models]?.[provider] ?? "";
-  const effort = config[fields[task].efforts]?.[provider]?.[model] ?? "medium";
+  const effort = efforts.find((value) => value === config[fields[task].efforts]?.[provider]?.[model]) ?? "medium";
   return { model, effort };
 }
 
@@ -162,7 +162,7 @@ export function TaskModels({
   return (
     <div className="flex flex-col gap-2">
       {backgroundOnly && <p className="text-xs text-muted-foreground">后台处理 · {providerLabel(provider)}</p>}
-      {(provider === "api" ? apiTasks : tasks).filter(([task]) => !backgroundOnly || task !== "chat").map(([task, label]) => {
+      {(provider === "api" ? apiTasks : tasks).filter(([task]) => !backgroundOnly || task === "vision").map(([task, label]) => {
         const { model, effort } = taskChoice(config, task);
         const usable = usableModels(provider, models, task);
         const recommended = selectedAgentModel(usable, "", task);

@@ -34,15 +34,15 @@ it("streams a DSH turn over ACP and queues the same project session on resume", 
       js,
       `#!/usr/bin/env node
 import readline from "node:readline";
-let model="dsh-default";
-const offers=()=>[{id:"model",category:"model",currentValue:model,options:[{value:"dsh-default",name:"Default model"},{value:"dsh-alt",name:"Alternate"}]}];
+let model="dsh-default",effort="low";
+const offers=()=>[{id:"model",category:"model",currentValue:model,options:[{value:"dsh-default",name:"Default model"},{value:"dsh-alt",name:"Alternate"}]},{id:"reasoning_effort",category:"thought_level",currentValue:effort,options:(model==="dsh-alt"?["off","high"]:["low"]).map(value=>({value,name:value}))}];
 const out=x=>console.log(JSON.stringify({jsonrpc:"2.0",...x}));
 readline.createInterface({input:process.stdin}).on("line",line=>{
  const {id,method,params}=JSON.parse(line);let result={};
  if(method==="initialize") result={protocolVersion:1,agentCapabilities:{}};
  if(method==="session/new")result={sessionId:"session-42",configOptions:offers()};
  if(method==="session/resume"&&params.sessionId!=="session-42")process.exit(4);
- if(method==="session/set_config_option"){model=params.value;result={configOptions:offers()}}\n if(method==="session/prompt"){if(model!=="dsh-alt")process.exit(5);out({method:"session/update",params:{sessionId:params.sessionId,update:{sessionUpdate:"agent_message_chunk",content:{type:"text",text:"test answer"}}}});result={stopReason:"end_turn"}}
+ if(method==="session/set_config_option"){if(params.configId==="model")model=params.value;else effort=params.value;result={configOptions:offers()}}\n if(method==="session/prompt"){if(model!=="dsh-alt"||effort!=="high")process.exit(5);out({method:"session/update",params:{sessionId:params.sessionId,update:{sessionUpdate:"agent_message_chunk",content:{type:"text",text:"test answer"}}}});result={stopReason:"end_turn"}}
  if(id!==undefined)out({id,result});
 });`,
     );
@@ -64,6 +64,7 @@ readline.createInterface({input:process.stdin}).on("line",line=>{
         executable,
         prompt: "synthetic",
         model: "dsh-alt",
+        effort: "high",
         images: [],
         resume,
       };
@@ -86,9 +87,13 @@ readline.createInterface({input:process.stdin}).on("line",line=>{
         .map((l) => JSON.parse(l));
       if (operation === "native-catalog") {
         expect(events.at(-1)).toMatchObject({ type: "complete", models: [
-          { id: "dsh-default", isDefault: true }, { id: "dsh-alt", isDefault: false },
+          { id: "dsh-default", isDefault: true }, { id: "dsh-alt", isDefault: false, nativeEfforts:[{id:"off"},{id:"high"}] },
         ] });
         expect(events.some((event) => event.type === "delta")).toBe(false);
+        return;
+      }
+      if (operation === "native-translation") {
+        expect(events.at(-1)).toMatchObject({type:"complete",text:"test answer",turnUsage:{model:"dsh-alt",effort:"high"}});
         return;
       }
       expect(events.find((e) => e.type === "delta")).toMatchObject({
@@ -103,6 +108,8 @@ readline.createInterface({input:process.stdin}).on("line",line=>{
       return events.at(-1).id;
     }
     await run(undefined, "native-catalog");
+    await run(undefined, "native-translation");
+    await expect(readFile(path.join(dsh, "cordis.patch.yml"))).rejects.toMatchObject({code:"ENOENT"});
     await run(await run());
     expect(
       await readFile(path.join(dsh, "cordis.patch.yml"), "utf8"),

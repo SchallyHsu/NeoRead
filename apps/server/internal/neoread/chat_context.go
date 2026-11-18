@@ -32,6 +32,7 @@ type chatEntry struct {
 
 // Private request metadata: never accepted from HTTP clients or documents.
 type turnUsage struct {
+	Effort      string   `json:"effort,omitempty"`
 	Model       string   `json:"model,omitempty"`
 	Estimated   bool     `json:"estimated,omitempty"`
 	Provider    string   `json:"provider,omitempty"`

@@ -48,7 +48,9 @@ func (s *Server) quickPaperMetadata(ctx context.Context, d Document) (quickPaper
 // saving it. An AI candidate never replaces the user's current title.
 func (s *Server) suggestPaperTitle(ctx context.Context, id string, quick quickPaperMetadata) string {
 	config := s.aiConfig()
-	if !validAgent(config.Primary) || !(primaryCapable(config, taskTranslation) || capable(config, "text-api", false)) || len(quick.Pages) == 0 || strings.TrimSpace(quick.Pages[0]) == "" {
+	// Metadata lookup is a background library task, even when a native reader is active.
+	config.NativeAgent = nil
+	if !translationReady(config) || len(quick.Pages) == 0 || strings.TrimSpace(quick.Pages[0]) == "" {
 		return ""
 	}
 	runes := []rune(quick.Pages[0])

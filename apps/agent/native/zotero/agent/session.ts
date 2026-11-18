@@ -371,7 +371,8 @@ export class AcpAgentSession implements AgentSession {
   }
 
   efforts(): ModeOption[] {
-    return this.#catalog.efforts;
+    const levels = this.#catalog.levels?.get(this.currentModel() ?? "");
+    return levels ? this.#catalog.efforts.filter((effort) => levels.includes(effort.id)) : this.#catalog.efforts;
   }
   currentEffort(): string | undefined {
     return this.#catalog.currentEffort;

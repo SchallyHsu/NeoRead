@@ -682,7 +682,7 @@ export interface WebSource {
   publishedAt?: string;
   truncated?: boolean;
 }
-export interface TurnUsage {model?:string;estimated?:boolean;provider?:string;inputTokens?:number;outputTokens?:number;costUsd?:number;contextUsed?:number;contextSize?:number}
+export interface TurnUsage {model?:string;effort?:string;estimated?:boolean;provider?:string;inputTokens?:number;outputTokens?:number;costUsd?:number;contextUsed?:number;contextSize?:number}
 export interface Message {
   usage?:TurnUsage;
   webSearch?: boolean;
@@ -824,9 +824,9 @@ export interface AIConfig {
   webSearch?: WebSearchConfig;
   primary: string;
   models: Record<string, string>;
-  efforts?: Record<string, Record<string, ReasoningEffort>>;
+  efforts?: Record<string, Record<string, string>>;
   translationModels?: Record<string, string>;
-  translationEfforts?: Record<string, Record<string, ReasoningEffort>>;
+  translationEfforts?: Record<string, Record<string, string>>;
   /** Translation style and terminology preferences. Empty uses the default. */
   translationPrompt?: string;
   /** Image-input model of the "api" agent; other agents use their chat model. */
@@ -841,6 +841,7 @@ export interface AIConfig {
   capabilities: Record<string, AICapability>;
 }
 export interface AgentModel {
+  nativeEfforts?: { id: string; name: string }[];
   contextWindow?: number;
   maxOutputTokens?: number;
   effortInfo?: {

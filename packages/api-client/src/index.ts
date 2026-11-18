@@ -574,9 +574,10 @@ export const api = {
     signal?: AbortSignal,
     refresh = false,
     cacheOnly = false,
+    model?: string,
   ) =>
     request<AgentModel[]>(
-      `/api/ai/models?provider=${encodeURIComponent(provider)}${refresh ? "&refresh=true" : ""}${cacheOnly ? "&cached=true" : ""}`,
+      `/api/ai/models?provider=${encodeURIComponent(provider)}${refresh ? "&refresh=true" : ""}${cacheOnly ? "&cached=true" : ""}${model ? "&model=" + encodeURIComponent(model) : ""}`,
       { signal },
     ),
   saveAIConfig: (config: AIConfig) =>

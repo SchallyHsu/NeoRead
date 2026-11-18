@@ -6,7 +6,12 @@ import (
 	"time"
 )
 
+type nativeEffort struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
 type AgentModel struct {
+	NativeEfforts   []nativeEffort `json:"nativeEfforts,omitempty"`
 	EffortInfo      *APIEffortInfo `json:"effortInfo,omitempty"`
 	ContextWindow   int            `json:"contextWindow,omitempty"`
 	MaxOutputTokens int            `json:"maxOutputTokens,omitempty"`
@@ -28,7 +33,12 @@ func (s *Server) agentModels(w http.ResponseWriter, r *http.Request) {
 	if nativeProvider(provider) {
 		ctx, cancel := context.WithTimeout(r.Context(), nativeCatalogTimeout)
 		defer cancel()
-		models, err := s.nativeModelCatalog(catalogRequestContext(ctx, r), provider)
+		model := r.URL.Query().Get("model")
+		if len(model) > 512 {
+			fail(w, 400, "模型名称过长")
+			return
+		}
+		models, err := s.nativeModelCatalog(catalogRequestContext(ctx, r), provider, model)
 		if err != nil {
 			fail(w, 502, "无法读取本机 Agent 模型列表："+err.Error())
 			return

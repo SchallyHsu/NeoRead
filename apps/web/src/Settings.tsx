@@ -1503,18 +1503,18 @@ export function Settings({
                     </Button>
                   )}
                   <div className="grid gap-2" data-tour="task-models">
-                    {isNativeAgent(selectedReader) && (
-                      <div className="flex items-center gap-2">
-                        <span className="w-10 shrink-0 text-sm">问答</span>
-                        <NativeChatModel key={selectedReader} provider={selectedReader} disabled={saving} discover={open} />
+                    {isNativeAgent(selectedReader) && (["chat","translation"] as const).map((task) => (
+                      <div key={selectedReader + task} className="flex items-center gap-2">
+                        <span className="w-10 shrink-0 text-sm">{task === "chat" ? "问答" : "翻译"}</span>
+                        <NativeChatModel provider={selectedReader} task={task} disabled={saving} discover={open} />
                       </div>
-                    )}
-                    <TaskModels
+                    ))}
+                    {(!isNativeAgent(selectedReader) || config.primary === "api") && <TaskModels
                       disabled={saving || testing.size > 0}
                       backgroundOnly={isNativeAgent(selectedReader)}
                       refreshKey={modelRefresh}
                       onAPIModelsLoaded={setAPIModels}
-                    />
+                    />}
                   </div>
                 </div>
               )}

@@ -636,7 +636,7 @@ it("scopes the reader model and project shortcut to the active CLI while retaini
   await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
   expect(host.querySelector('[aria-label="Codex 问答模型"]')?.textContent).toContain("codex-choice");
   expect(host.querySelector('[aria-label="问答模型"]')).toBeNull();
-  expect(host.querySelector('[aria-label="翻译模型"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Codex 翻译模型"]')).not.toBeNull();
   const shortcut = Array.from(host.querySelectorAll("button")).find((b) => b.textContent?.includes("对话保存设置 · Codex"));
   await act(async () => shortcut!.click());
   expect(host.querySelector('form[aria-label="Codex 项目对话"]')).not.toBeNull();

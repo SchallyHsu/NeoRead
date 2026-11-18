@@ -97,6 +97,12 @@ func (s *Server) taskGenerationService(config AIConfig, task modelTask) *Generat
 	if task == taskTranslation && config.TranslationPrompt != nil {
 		g.translationInstructions = *config.TranslationPrompt
 	}
+	if provider := translationProvider(config); task == taskTranslation && nativeProvider(provider) {
+		model := translationModel(config, provider)
+		g.primary = provider
+		g.connections[provider] = generationConnection{Adapter: nativeTranslationAdapter{s, provider, config.NativeAgent.Executables[provider], model, config.TranslationEfforts[provider][model]}, VerifiedText: true, Incremental: true}
+		return g
+	}
 	for p := range piProviders {
 		g.connections[p] = generationConnection{piProviderAdapter{s, p, config, task}, piReady(config, p, false), piReady(config, p, true), true}
 	}
@@ -230,7 +236,7 @@ func (g *GenerationService) generate(ctx context.Context, in AIInput, interactiv
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if !validAgent(g.primary) {
+	if !validAgent(g.primary) && !nativeProvider(g.primary) {
 		return AIResult{}, generationError(ErrorConfiguration, "请在设置中指定主 Agent 并测试")
 	}
 	vision := len(in.images()) > 0
@@ -290,7 +296,7 @@ func (g *GenerationService) generate(ctx context.Context, in AIInput, interactiv
 }
 
 func (g *GenerationService) ValidateInput(in AIInput, interactive bool) error {
-	if !validAgent(g.primary) {
+	if !validAgent(g.primary) && !nativeProvider(g.primary) {
 		return generationError(ErrorConfiguration, "请选择主 Agent")
 	}
 	vision := len(in.images()) > 0

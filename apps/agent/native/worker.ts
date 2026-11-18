@@ -20,6 +20,8 @@ type Request = {
   title: string;
   executable?: string;
   model?: string;
+  effort?: string;
+  systemPrompt?: string;
   resume?: string;
   projectId?: string;
   bridgeDir: string;
@@ -87,8 +89,10 @@ lines.on("line", async (line) => {
     const cli = await findCli(spawner, env, spec, r.executable);
     if (!cli) throw Error();
     const catalog = operation === "native-catalog";
-    if (!catalog) await mkdir(r.cwd, { recursive: true, mode: 0o700 });
-    const cwd = catalog ? process.cwd() : await realpath(r.cwd);
+    const translation = operation === "native-translation";
+    const temporary = catalog || translation;
+    if (!temporary) await mkdir(r.cwd, { recursive: true, mode: 0o700 });
+    const cwd = temporary ? process.cwd() : await realpath(r.cwd);
     const node = process.execPath;
     let args = spec.directArgs ? [...spec.directArgs] : [];
     let command = cli,
@@ -96,7 +100,8 @@ lines.on("line", async (line) => {
       projectId = r.projectId || "",
       pending = "";
     const project = { cwd, projectName: r.projectName, title: r.title };
-    if (catalog && r.backend === "antigravity") {
+    if (temporary && r.backend === "antigravity") {
+      if (translation) args.push("--sandbox");
       args.push(
         "--gemini-dir",
         path.resolve(
@@ -151,6 +156,8 @@ lines.on("line", async (line) => {
       node,
       claudeExecutable: r.backend === "claude-code" ? cli : undefined,
     });
+    if (translation && r.backend === "deepseek-harness")
+      childEnv.DSH_PERMISSION_MODE = "read-only";
     if (r.backend === "codex")
       childEnv.CODEX_CONFIG = JSON.stringify({
         sandbox_mode: "read-only",
@@ -168,8 +175,13 @@ lines.on("line", async (line) => {
     session = await AcpAgentSession.open(client, spec, {
       backend: r.backend,
       cwd,
-      brief: catalog ? "" : "你在 NeoRead 阅读侧栏中回答问题。",
-      ephemeral: catalog,
+      brief: translation
+        ? r.systemPrompt || "你是翻译助手。按照请求翻译资料，不调用工具。"
+        : catalog
+          ? ""
+          : "你在 NeoRead 阅读侧栏中回答问题。",
+      ephemeral: temporary,
+      locked: translation,
       resumeSessionId: resume,
       freshNativeSession: !!resume && !r.resume,
     });
@@ -181,11 +193,23 @@ lines.on("line", async (line) => {
       if (current && !models.some((model) => model.id === current)) {
         models.unshift({ id: current, name: current });
       }
+      // Each backend can change its offered levels when the model changes.
+      if (
+        r.model &&
+        r.model !== current &&
+        models.some((m) => m.id === r.model)
+      ) {
+        phase = "model";
+        await session.setModel(r.model);
+      }
+      const target = r.model || current;
+      const levels = session.efforts().map(({ id, name }) => ({ id, name }));
       send({
         type: "complete",
         models: models.map((model) => ({
           ...model,
           isDefault: model.id === current,
+          ...(model.id === target && { nativeEfforts: levels }),
         })),
       });
       return;
@@ -193,6 +217,12 @@ lines.on("line", async (line) => {
     if (r.model && r.model !== session.currentModel()) {
       phase = "model";
       await session.setModel(r.model);
+    }
+    if (r.effort && r.effort !== session.currentEffort()) {
+      phase = "effort";
+      if (!session.efforts().some((level) => level.id === r.effort))
+        throw Error();
+      await session.setEffort(r.effort);
     }
     phase = "answer";
     if (r.images?.length && !session.supportsImages) {
@@ -203,6 +233,7 @@ lines.on("line", async (line) => {
       reasoning = "",
       completed = false;
     let turnUsage: Usage | undefined;
+    let translationTool = false;
     session.on((event) => {
       if (event.t === "text") {
         answer += event.delta;
@@ -213,17 +244,31 @@ lines.on("line", async (line) => {
         send({ type: "reasoning", text: event.delta });
       }
       if (event.t === "permission") session!.respondPermission(event.id, null);
+      if (translation && event.t === "tool" && !translationTool) {
+        translationTool = true;
+        void session!.cancel().catch(() => {});
+      }
       if (event.t === "turn_end") {
         completed = event.stop === "end_turn";
         turnUsage = event.usage;
       }
     });
     await session.prompt({ text: r.prompt, images: r.images });
-    if (!completed || !answer.trim() || stopping) throw Error();
+    if (translationTool || !completed || !answer.trim() || stopping) throw Error();
     const agentSessionId = session.sessionId;
     const model = session.currentModel();
+    const effort = session.currentEffort();
     await session.close();
     session = undefined;
+    if (translation) {
+      send({
+        type: "complete",
+        text: answer,
+        entries: reasoning,
+        turnUsage: { ...turnUsage, model, effort },
+      });
+      return;
+    }
     try {
       let info;
       if (r.backend === "deepseek-harness") {
@@ -278,7 +323,7 @@ lines.on("line", async (line) => {
       message: pending,
       code: projectId,
       entries: reasoning,
-      turnUsage: { ...turnUsage, model },
+      turnUsage: { ...turnUsage, model, effort },
     });
   } catch {
     send({ type: "error", code: phase });

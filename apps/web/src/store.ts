@@ -396,14 +396,16 @@ useReaderStore.subscribe((state, previous) => {
     state.libraryPreferences === previous.libraryPreferences
   )
     return;
+  const cfg = state.aiConfig;
+  const native = cfg?.nativeAgent?.provider;
+  const provider = native || cfg?.primary || "";
   if (typeof window !== "undefined")
     window.neoreadDesktop?.diagnosticSettings?.({
       ...state.theme,
       mode: state.libraryPreferences.mode,
       primaryMode: state.libraryPreferences.primaryMode,
-      provider: state.aiConfig?.primary,
-      chatModel: state.aiConfig?.models[state.aiConfig.primary],
-      translationModel:
-        state.aiConfig?.translationModels?.[state.aiConfig.primary],
+      provider,
+      chatModel: cfg?.models[provider],
+      translationModel: cfg?.translationModels?.[provider] || (native ? cfg?.models[provider] : undefined),
     });
 });

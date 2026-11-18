@@ -20,9 +20,37 @@ type translationRunOptions struct {
 	Prompt      string `json:"prompt"`
 }
 
+func translationProvider(c AIConfig) string {
+	if c.NativeAgent != nil && nativeProvider(c.NativeAgent.Provider) {
+		return c.NativeAgent.Provider
+	}
+	return c.Primary
+}
+
+func translationReady(c AIConfig) bool {
+	p := translationProvider(c)
+	if nativeProvider(p) {
+		for _, cmd := range nativeCommands {
+			if cmd.id == p {
+				return nativeInstalled(cmd.command, c.NativeAgent.Executables[p])
+			}
+		}
+		return false
+	}
+	return validAgent(p) && (primaryCapable(c, taskTranslation) || capable(c, "text-api", false))
+}
+
+func translationModel(c AIConfig, provider string) string {
+	if model := c.TranslationModels[provider]; model != "" || !nativeProvider(provider) || c.translationFrozen {
+		return model
+	}
+	return c.Models[provider]
+}
+
 func snapshotTranslationOptions(c AIConfig) translationRunOptions {
-	model := c.TranslationModels[c.Primary]
-	o := translationRunOptions{Provider: c.Primary, Model: model, Effort: c.TranslationEfforts[c.Primary][model]}
+	provider := translationProvider(c)
+	model := translationModel(c, provider)
+	o := translationRunOptions{Provider: provider, Model: model, Effort: c.TranslationEfforts[provider][model]}
 	if c.TranslationPrompt != nil {
 		o.Prompt = *c.TranslationPrompt
 	}
@@ -33,7 +61,17 @@ func (o *translationRunOptions) apply(c AIConfig) AIConfig {
 	if o == nil || o.Provider == "" {
 		return c
 	}
+	c.translationFrozen = true
 	c.Primary = o.Provider
+	if c.NativeAgent != nil {
+		// Applying saved work must not pick up a later agent switch.
+		native := *c.NativeAgent
+		native.Provider = ""
+		if nativeProvider(o.Provider) {
+			native.Provider = o.Provider
+		}
+		c.NativeAgent = &native
+	}
 	c.TranslationModels = maps.Clone(c.TranslationModels)
 	if c.TranslationModels == nil {
 		c.TranslationModels = map[string]string{}
@@ -96,7 +134,7 @@ func (s *Server) requestReparseAndTranslation(w http.ResponseWriter, r *http.Req
 	}
 	defer lock.Unlock()
 	config := s.aiConfig()
-	providerReady := validAgent(config.Primary) && (primaryCapable(config, taskTranslation) || capable(config, "text-api", false))
+	providerReady := translationReady(config)
 	if requireProvider && !providerReady {
 		fail(w, 409, "请先配置并检测翻译模型")
 		return
