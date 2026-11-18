@@ -10,7 +10,7 @@
 
 [cynicalight and the upstream contributors](https://github.com/cynicalight/NeoRead) developed the NeoRead reader. **SchallyHsu maintains this unofficial integration fork**. The agent protocol and native project adapters come from [Zotero Agent zh-CN](https://github.com/SchallyHsu/zotero-agent-zh-CN), a derivative of the [Zotero MCP plugin](https://github.com/54yyyu/zotero-mcp).
 
-This fork connects Claude Code, Codex, Antigravity and DeepSeek Harness to the reading sidebar and adds PDF, EPUB and chat sync through your own WebDAV server. Follow the source build instructions below to run the integrated version. [Two-device setup (Chinese)](docs/native-agents-webdav.zh-CN.md) · [Credits and provenance](NOTICE.md)
+This fork connects Claude Code, Codex, Antigravity and DeepSeek Harness to the reading sidebar and adds PDF, EPUB and chat sync through your own WebDAV server. Download the Windows reader and companion add-on from the fork release, or build from source below. [Windows and Zotero downloads](https://github.com/SchallyHsu/NeoRead/releases/tag/neoread-zotero-sync-0.1.1) · [Cross-app and mobile sync (Chinese)](integrations/zotero-sync/README.md) · [Two-device setup (Chinese)](docs/native-agents-webdav.zh-CN.md) · [Credits and provenance](NOTICE.md)
 
 A local-first EPUB / PDF reader for books and papers, with side-by-side translations, annotations, and AI assistance grounded in the text you are reading.
 
