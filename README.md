@@ -10,7 +10,20 @@
 
 NeoRead 阅读器由 [cynicalight 和上游贡献者](https://github.com/cynicalight/NeoRead) 开发。本仓库是 **SchallyHsu 维护的非官方整合分支**。Agent 通信和项目归档复用了 [Zotero Agent 中文版](https://github.com/SchallyHsu/zotero-agent-zh-CN) 的实现，其插件源自 [Zotero MCP](https://github.com/54yyyu/zotero-mcp)。
 
-本分支在原有 Agent 连接卡片中加入了 Claude Code、Codex、Antigravity 和 DeepSeek Harness。每个连接可以配置项目归档，阅读聊天中可以查看账号额度与上下文占用。自有 WebDAV 主机可同步 PDF、EPUB 和聊天。Windows 电脑可在发布页下载整合版和配套 Zotero 扩展。其他平台可使用下方的源码构建步骤。[下载 Windows 版和 Zotero 扩展](https://github.com/SchallyHsu/NeoRead/releases/tag/neoread-zotero-sync-0.1.7) · [跨应用与移动端同步说明](integrations/zotero-sync/README.md) · [双机配置指南](docs/native-agents-webdav.zh-CN.md) · [原创与来源声明](NOTICE.md)
+### 2026-11-18 相对上游的改动
+
+对照上游 NeoRead 0.13.0（`5ebe4ca`）与本分支整合版 0.1.7（`da9aed8`）。原版已提供 PDF / EPUB 阅读、AI 问答与翻译，以及从本机 Zotero 迁移文献的功能。[查看本次完整代码差异](https://github.com/SchallyHsu/NeoRead/compare/5ebe4caf10090259e3a4d4c0757be0278bd43e3e...da9aed8969c90048c8347f682fd9b5265d6f0af7)
+
+| 方面 | 本分支的改动 |
+| --- | --- |
+| Agent 接入 | 在原有连接设置中加入 Codex CLI、Claude Code、Antigravity 和 DeepSeek Harness。用户可沿用本机客户端的登录状态，在阅读侧栏调用这些助手。原有 ChatGPT、Claude 等 Pi 连接仍可使用。 |
+| 问答与翻译 | 侧栏按当前助手列出模型。翻译默认跟随问答，也可单独选模型。两项任务分别记住每个模型的推理强度。Codex 通过用户选定的 CLI 读取可用档位，DeepSeek 的同名模型显示服务来源。修复了刷新列表时已选模型跳回旧值的问题。 |
+| 项目与会话 | 每个连接可指定项目目录。四种本机助手可将阅读聊天关联到各自的原生项目，方便在客户端续聊。每轮已完成的问答也可另存为项目 Markdown。 |
+| 阅读侧栏 | 增加账号剩余额度与当前会话上下文占用提醒，分别在剩余额度降至 30% / 10%、上下文占用达到 70% / 85% 时提示。在「设置 → 显示」加入 Agent 字号入口，并把原有字号上限从 160% 提高到 200%。 |
+| 文献同步 | 配套 Zotero 桌面扩展可在个人文库与 NeoRead 之间持续交换 PDF、EPUB。多台电脑可复用已有的 WebDAV 服务，优先读取校验通过的 Zotero 附件压缩包，减少重复上传。 |
+| 聊天同步 | 按论文关联的已完成问答通过用户自己的 WebDAV 在 Zotero Agent 与 NeoRead 间同步。换电脑后可在 NeoRead 接着聊。手机和 iPad 可用 Zotero 打开论文，用同一 WebDAV 上的只读页面查看聊天。 |
+
+当前跨应用同步覆盖文献原件和已完成的文字问答。批注修改、阅读进度和译文仍由各应用分别管理。整合版已在 Windows x64 打包验证。[Windows 版和 Zotero 扩展](https://github.com/SchallyHsu/NeoRead/releases/tag/neoread-zotero-sync-0.1.7) · [跨应用与移动端同步说明](integrations/zotero-sync/README.md) · [双机配置指南](docs/native-agents-webdav.zh-CN.md) · [原创与来源声明](NOTICE.md)
 
 一个本地优先的 EPUB / PDF AI 阅读器，用于阅读电子书与论文、对照译文、记录批注，以及结合原文向 AI 提问。
 
@@ -18,7 +31,7 @@ NeoRead 阅读器由 [cynicalight 和上游贡献者](https://github.com/cynical
   <img src="website/assets/screenshots/pdf-bilingual-ai.webp" alt="NeoRead 的 PDF 双语阅读界面：左侧目录，中间原文与译文，右侧 AI 助读" />
 </p>
 
-NeoRead 以 EPUB 和 PDF 为两种核心文档格式，将图书库与论文库分开管理，提供目录、搜索、双语对照、批注与 AI 助读。文档、阅读进度和笔记保存在本机。AI 由内置 Pi 运行。用户可以登录 ChatGPT、Claude 或 Kimi Code，也可以使用厂商 API Key 或自定义兼容接口。
+NeoRead 以 EPUB 和 PDF 为两种核心文档格式，将图书库与论文库分开管理，提供目录、搜索、双语对照、批注与 AI 助读。文档、阅读进度和笔记保存在本机。原版的 AI 连接由内置 Pi 运行。用户可以登录 ChatGPT、Claude 或 Kimi Code，也可以使用厂商 API Key 或自定义兼容接口。
 
 原项目提供 macOS（Apple Silicon）DMG 和 Windows x64 EXE 安装包。[原项目官网](https://neoread.app/) · [上游官方 Releases](https://github.com/cynicalight/NeoRead/releases)。Intel Mac 安装包暂停构建，Linux 不提供安装包，也可以从源码运行。安装包没有受系统信任的开发者证书，首次运行可能需要允许系统安全提示。流程与验证范围见[安装包与发版说明](docs/releasing.md)。
 
