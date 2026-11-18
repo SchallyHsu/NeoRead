@@ -31,7 +31,18 @@ type chatEntry struct {
 }
 
 // Private request metadata: never accepted from HTTP clients or documents.
+type turnUsage struct {
+	Model       string   `json:"model,omitempty"`
+	Estimated   bool     `json:"estimated,omitempty"`
+	Provider    string   `json:"provider,omitempty"`
+	Input       *int64   `json:"inputTokens,omitempty"`
+	Output      *int64   `json:"outputTokens,omitempty"`
+	Cost        *float64 `json:"costUsd,omitempty"`
+	ContextUsed *int64   `json:"contextUsed,omitempty"`
+	ContextSize *int64   `json:"contextSize,omitempty"`
+}
 type chatInput struct {
+	Usage                  *turnUsage
 	piInvalidateCheckpoint func()
 	piRunID                string
 	piResume               *piCheckpoint

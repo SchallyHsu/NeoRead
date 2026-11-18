@@ -237,12 +237,12 @@ func (s *Server) chatDocument(w http.ResponseWriter, r *http.Request, document D
 		}
 	}
 	if nativeProvider(provider) {
-		cfg, err := s.nativeSettings()
-		if err != nil || cfg.Provider != provider || r.PathValue("session") == "" {
+		cfg := config.NativeAgent
+		if cfg == nil || cfg.Provider != provider || r.PathValue("session") == "" {
 			fail(w, 400, "请在设置中选择原生 Agent 并打开阅读会话")
 			return
 		}
-		config.native = &cfg
+		config.native = cfg
 	} else if err := s.generationService(config).ValidateInput(AIInput{Images: images}, true); err != nil {
 		s.diagnosticEvent(slog.LevelError, "chat.admission.rejected", "requestId", requestID(r.Context()), "provider", provider, "errorCode", errorKind(err), "vision", len(images) > 0, "textReady", capable(config, provider, false))
 		fail(w, 400, err.Error())

@@ -1,3 +1,5 @@
+import { ChatMeters } from "./ChatMeters";
+import { providerLabel } from "./ProviderIdentity";
 import { useAnnotationUpdates } from "./useAnnotationUpdates";
 import { webSearchEnabled } from "./chat/web-search";
 import { NavigationTree } from "./NavigationTree";
@@ -103,7 +105,7 @@ import { ModelSelector } from "./ModelSelector";
 import { SourceReferences } from "./SourceReferences";
 import { ChatSession } from "./chat/chat-session";
 import { getChatSession } from "./chat/session-registry";
-import { nativeAgentLabels } from "./NativeAgentSettings";
+import { readingAgent, isNativeAgent } from "./NativeAgentSettings";
 import { SessionPicker } from "./chat/SessionPicker";
 import { AssistantPanel } from "./chat/AssistantPanel";
 import { ImagePreview, imageLabel } from "./ImagePreview";
@@ -411,15 +413,9 @@ export function Workspace({
   }
   const currentSession =
     sessions.find((s) => s.id === preferred) ?? sessions[0];
-  const [nativeProvider,setNativeProvider] = useState("");
-  useEffect(()=>{
-    let active=true;
-    const refresh=()=>void api.nativeAgent?.().then(cfg=>{if(active)setNativeProvider(cfg.provider)}).catch(()=>{});
-    refresh();window.addEventListener("native-agent-changed",refresh);
-    return ()=>{active=false;window.removeEventListener("native-agent-changed",refresh)};
-  },[]);
-  const provider = nativeProvider || aiConfig?.primary || "";
-  const webSearch = !nativeProvider && webSearchEnabled(provider, aiConfig?.webSearch);
+  const provider = readingAgent(aiConfig);
+  const native = isNativeAgent(provider);
+  const webSearch = !native && webSearchEnabled(provider, aiConfig?.webSearch);
   const sessionListSerial = useRef(0);
   const refreshSessions = useCallback(async () => {
     const serial = ++sessionListSerial.current;
@@ -1771,11 +1767,31 @@ export function Workspace({
                     }}
                   />
                   <div className="compose-footer">
-                    {nativeProvider ? <Button variant="ghost" size="sm" onClick={onSettings}>{nativeAgentLabels[nativeProvider]}</Button> : <ModelSelector
-                      key={provider}
-                      disabled={sending || !currentSession}
-                      onSettings={onSettings}
-                    />}
+                    {native ? (
+                      <Button variant="ghost" size="sm" onClick={onSettings}>
+                        {providerLabel(provider)}
+                      </Button>
+                    ) : (
+                      <ModelSelector key={provider} disabled={sending || !currentSession} onSettings={onSettings} />
+                    )}
+                    {provider && (
+                      <ChatMeters
+                        key={provider}
+                        provider={provider}
+                        messages={chat.messages}
+                        connectionKey={aiConfig?.nativeAgent?.executables[provider] || ""}
+                        active={right && rightTab === "ai"}
+                        onNewChat={sending ? undefined : async () => {
+                          try {
+                            const fresh = await api.createChatSession(doc.id, provider);
+                            await refreshSessions();
+                            selectSession(fresh.id);
+                          } catch (error) {
+                            toast.error((error as Error).message);
+                          }
+                        }}
+                      />
+                    )}
                     {sending ? (
                       <Button
                         size="icon-sm"

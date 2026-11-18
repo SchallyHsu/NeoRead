@@ -6,7 +6,7 @@
     {
       "/api/webdav": {"get": {"summary": "Read WebDAV settings", "responses": {"200": {"description": "WebDAV settings and last result", "content": {"application/json": {"schema": {"type": "object", "properties": {"url": {"type": "string"}, "enabled": {"type": "boolean"}, "username": {"type": "string"}, "status": {"type": "object", "properties": {"at": {"type": "string"}, "error": {"type": "string"}, "uploaded": {"type": "integer"}, "downloaded": {"type": "integer"}}}}}}}}}}, "put": {"summary": "Configure WebDAV and store password in system keyring", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"url": {"type": "string"}, "enabled": {"type": "boolean"}, "username": {"type": "string"}, "password": {"type": "string"}}}}}}, "responses": {"200": {"description": "WebDAV settings and last result", "content": {"application/json": {"schema": {"type": "object", "properties": {"url": {"type": "string"}, "enabled": {"type": "boolean"}, "username": {"type": "string"}, "status": {"type": "object", "properties": {"at": {"type": "string"}, "error": {"type": "string"}, "uploaded": {"type": "integer"}, "downloaded": {"type": "integer"}}}}}}}}}}},
       "/api/webdav/sync": {"post": {"summary": "Exchange portable documents and chat turns", "responses": {"200": {"description": "Sync result", "content": {"application/json": {"schema": {"type": "object", "properties": {"at": {"type": "string"}, "error": {"type": "string"}, "uploaded": {"type": "integer"}, "downloaded": {"type": "integer"}}}}}}}}},
-      "/api/native-agent": {"get": {"summary": "Read native reader agent settings", "responses": {"200": {"description": "Settings", "content": {"application/json": {"schema": {"type": "object", "required": ["provider", "projectName", "directory", "executables"], "properties": {"provider": {"type": "string"}, "projectName": {"type": "string"}, "directory": {"type": "string"}, "executables": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}}}, "put": {"summary": "Set native reader agent and project", "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["provider", "projectName", "directory", "executables"], "properties": {"provider": {"type": "string"}, "projectName": {"type": "string"}, "directory": {"type": "string"}, "executables": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}, "responses": {"200": {"description": "Saved settings", "content": {"application/json": {"schema": {"type": "object", "required": ["provider", "projectName", "directory", "executables"], "properties": {"provider": {"type": "string"}, "projectName": {"type": "string"}, "directory": {"type": "string"}, "executables": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}}}},
+      "/api/native-agent": {"get": {"summary": "Read native reader agent settings", "responses": {"200": {"description": "Settings", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/NativeAgentSettings"}}}}}}, "put": {"summary": "Set native reader agent and project", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref":"#/components/schemas/NativeAgentSettings"}}}}, "responses": {"200": {"description": "Saved settings", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/NativeAgentSettings"}}}}}}},
       "/api/documents/{id}/navigation":
         {
           "get":
@@ -3241,8 +3241,8 @@
       "/api/ai/quota": {
         "get": {
           "summary": "Read Claude weekly quota or Codex app allowance availability",
-          "parameters": [{"in": "query", "name": "provider", "required": true, "schema": {"type": "string", "enum": ["codex", "claude"]}}],
-          "responses": {"200": {"description": "Quota or an explicit unavailable reason", "content": {"application/json": {"schema": {"type": "object", "properties": {"remaining": {"type": "number", "minimum": 0, "maximum": 100}, "resetsAt": {"type": "string", "format": "date-time"}, "error": {"type": "string"}}}}}}}
+          "parameters": [{"in": "query", "name": "provider", "required": true, "schema": {"type": "string", "enum": ["codex", "claude","native:codex","native:claude-code","native:antigravity","native:deepseek-harness"]}},{"in":"query","name":"model","schema":{"type":"string","maxLength":256}}],
+          "responses": {"200": {"description": "Quota or an explicit unavailable reason", "content": {"application/json": {"schema": {"type": "object", "properties": {"account":{"$ref":"#/components/schemas/AccountQuota"},"remaining": {"type": "number", "minimum": 0, "maximum": 100}, "resetsAt": {"type": "string", "format": "date-time"}, "error": {"type": "string"}}}}}}}
         }
       },
       "/api/ai/auth/{provider}":
@@ -6623,6 +6623,7 @@
               "type": "object",
               "properties":
                 {
+                  "usage":{"$ref":"#/components/schemas/TurnUsage"},
                   "id": { "type": "string" },
                   "documentId": { "type": "string" },
                   "role": { "enum": ["user", "assistant"] },
@@ -6713,7 +6714,7 @@
                   "id":
                     {
                       "type": "string",
-                      "enum": ["codex", "claude", "kimi", "api"],
+                      "enum": ["codex", "claude", "kimi", "api", "native:codex", "native:claude-code", "native:antigravity", "native:deepseek-harness"],
                     },
                   "installed":
                     {
@@ -6721,7 +6722,7 @@
                       "description": "Whether the connection is configured.",
                     },
                   "authMethod":
-                    { "type": "string", "enum": ["oauth"] },
+                    { "type": "string", "enum": ["oauth","cli"] },
                   "authenticated": { "type": "boolean" },
                   "status": { "type": "string" },
                 },
@@ -7188,11 +7189,24 @@
                 },
               "required": ["provider", "url", "hasKey"],
             },
+          "AccountQuota":{"type":"object","required":["status","checkedAt","windows"],"properties":{
+            "status":{"type":"string"},"checkedAt":{"type":"number"},"retryAt":{"type":"number"},"plan":{"type":"string"},"message":{"type":"string"},
+            "windows":{"type":"array","items":{"type":"object","required":["id","label","usedPercent"],"properties":{"id":{"type":"string"},"label":{"type":"string"},"usedPercent":{"type":"number"},"resetsAt":{"type":"number"}}}},
+            "balances":{"type":"array","items":{"type":"object","required":["label","remaining"],"properties":{"label":{"type":"string"},"remaining":{"type":"string"},"currency":{"type":"string"}}}}}},
+          "TurnUsage":{"type":"object","properties":{"model":{"type":"string"},"provider":{"type":"string"},"estimated":{"type":"boolean"},"inputTokens":{"type":"number"},"outputTokens":{"type":"number"},"contextUsed":{"type":"number"},"contextSize":{"type":"number"},"costUsd":{"type":"number"}}},
+          "NativeAgentSettings": {
+            "type":"object","required":["provider","projectName","directory","executables"],
+            "properties":{"provider":{"type":"string"},"projectName":{"type":"string"},"directory":{"type":"string"},
+            "executables":{"type":"object","additionalProperties":{"type":"string"}},
+            "projects":{"type":"object","additionalProperties":{"type":"object","required":["name","directory","archive"],
+            "properties":{"name":{"type":"string"},"directory":{"type":"string"},"archive":{"type":"boolean"}}}}}
+          },
           "AIConfig":
             {
               "type": "object",
               "properties":
                 {
+                  "nativeAgent":{"$ref":"#/components/schemas/NativeAgentSettings"},
                   "webSearch":
                     { "$ref": "#/components/schemas/WebSearchConfig" },
                   "primary": { "type": "string" },

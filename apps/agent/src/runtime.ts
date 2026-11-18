@@ -441,7 +441,19 @@ export async function runAgent(
     if (!text.trim()) throw new Error("模型未返回回答");
     await checkpointBarrier;
     if (checkpointFailure) throw checkpointFailure;
-    return { text, entries: snapshot() };
+    const usage = session.getContextUsage?.();
+    return {
+      text,
+      entries: snapshot(),
+      ...(usage?.tokens != null &&
+        usage.contextWindow > 0 && {
+          turnUsage: {
+            contextUsed: usage.tokens,
+            contextSize: usage.contextWindow,
+            estimated: true,
+          },
+        }),
+    };
   } catch (error) {
     const canContinue =
       !signal.aborted && !checkpointFailure && canContinueSession(manager);

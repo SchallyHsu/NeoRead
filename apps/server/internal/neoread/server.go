@@ -30,6 +30,7 @@ import (
 )
 
 type Server struct {
+	legacyNativeJSON       string
 	nativeStartup          [2]sync.Mutex
 	davMu                  sync.Mutex
 	davStatusMu            sync.Mutex
@@ -87,8 +88,14 @@ type Server struct {
 	capabilityRechecks     map[string]capabilityRecheck
 }
 
-func NewServer(s *Store, token, web string) *Server { return &Server{Store: s, Token: token, Web: web} }
-func id() string                                    { b := make([]byte, 16); _, _ = rand.Read(b); return hex.EncodeToString(b) }
+func NewServer(s *Store, token, web string) *Server {
+	srv := &Server{Store: s, Token: token, Web: web}
+	if s != nil && s.DB != nil {
+		_ = s.DB.QueryRow("SELECT value FROM settings WHERE key='native-agent'").Scan(&srv.legacyNativeJSON)
+	}
+	return srv
+}
+func id() string { b := make([]byte, 16); _, _ = rand.Read(b); return hex.EncodeToString(b) }
 func respond(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

@@ -1,4 +1,4 @@
-import { Claude, DeepSeek, Kimi, OpenAI, Qwen } from "@lobehub/icons";
+import { Claude, DeepSeek, Gemini, Kimi, OpenAI, Qwen } from "@lobehub/icons";
 import { KeyRound } from "lucide-react";
 
 // The API agent is not one brand, so it uses a neutral key mark.
@@ -23,6 +23,22 @@ function APIAvatar({ size = 20 }: { size?: number; iconClassName?: string }) {
 }
 
 const providers = {
+  "native:codex": { Icon: OpenAI, Avatar: OpenAI.Avatar, label: "Codex" },
+  "native:claude-code": {
+    Icon: Claude,
+    Avatar: Claude.Avatar,
+    label: "Claude Code",
+  },
+  "native:antigravity": {
+    Icon: Gemini,
+    Avatar: Gemini.Avatar,
+    label: "Antigravity",
+  },
+  "native:deepseek-harness": {
+    Icon: DeepSeek,
+    Avatar: DeepSeek.Avatar,
+    label: "DeepSeek Harness",
+  },
   codex: { Icon: OpenAI, Avatar: OpenAI.Avatar, label: "ChatGPT" },
   claude: { Icon: Claude, Avatar: Claude.Avatar, label: "Claude" },
   kimi: { Icon: Kimi, Avatar: Kimi.Avatar, label: "Kimi Code" },

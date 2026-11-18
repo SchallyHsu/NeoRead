@@ -1,3 +1,4 @@
+import { readAccountUsage } from "./zotero/agent/account-usage";
 import { createInterface } from "node:readline";
 import { mkdir, realpath } from "node:fs/promises";
 import { AcpClient } from "./zotero/agent/acp";
@@ -7,7 +8,7 @@ import { ensureBridge } from "./zotero/agent/bridges";
 import { bridgeEnv, cleanEnv, stripApiKeys } from "./zotero/agent/env";
 import { syncSessionMetadata } from "./zotero/agent/session-metadata";
 import { createNodeSpawner } from "./zotero/node-spawner";
-import type { BackendId, PromptInput } from "./zotero/types";
+import type { BackendId, PromptInput, Usage } from "./zotero/types";
 
 type Request = {
   runId: string;
@@ -16,6 +17,7 @@ type Request = {
   projectName: string;
   title: string;
   executable?: string;
+  model?: string;
   resume?: string;
   projectId?: string;
   bridgeDir: string;
@@ -41,7 +43,8 @@ let started = false;
 lines.on("line", async (line) => {
   if (started) return;
   started = true;
-  const { input: r }: { input: Request } = JSON.parse(line);
+  const { type: operation, input: r }: { type: string; input: Request } =
+    JSON.parse(line);
   const send = (event: Record<string, unknown>) =>
     process.stdout.write(
       JSON.stringify({ version: 1, runId: r.runId, ...event }) + "\n",
@@ -58,6 +61,27 @@ lines.on("line", async (line) => {
       base,
       spec.id === "deepseek-harness" ? [] : spec.apiKeyVars,
     );
+    if (operation === "native-quota") {
+      const account =
+        r.backend === "codex"
+          ? await readAccountUsage(
+              spawner,
+              r.backend,
+              "subscription",
+              r.executable,
+            )
+          : await (
+              await helper("account-usage")
+            ).readOtherAccountUsage({
+              backend: r.backend,
+              ...(r.backend === "deepseek-harness" && {
+                cli: await findCli(spawner, env, spec, r.executable),
+                model: r.model || "deepseek-official/default",
+              }),
+            });
+      send({ type: "complete", quota: { account } });
+      return;
+    }
     const cli = await findCli(spawner, env, spec, r.executable);
     if (!cli) throw Error();
     await mkdir(r.cwd, { recursive: true, mode: 0o700 });
@@ -145,6 +169,7 @@ lines.on("line", async (line) => {
     let answer = "",
       reasoning = "",
       completed = false;
+    let turnUsage: Usage | undefined;
     session.on((event) => {
       if (event.t === "text") {
         answer += event.delta;
@@ -155,11 +180,15 @@ lines.on("line", async (line) => {
         send({ type: "reasoning", text: event.delta });
       }
       if (event.t === "permission") session!.respondPermission(event.id, null);
-      if (event.t === "turn_end") completed = event.stop === "end_turn";
+      if (event.t === "turn_end") {
+        completed = event.stop === "end_turn";
+        turnUsage = event.usage;
+      }
     });
     await session.prompt({ text: r.prompt, images: r.images });
     if (!completed || !answer.trim() || stopping) throw Error();
     const agentSessionId = session.sessionId;
+    const model = session.currentModel();
     await session.close();
     session = undefined;
     try {
@@ -216,6 +245,7 @@ lines.on("line", async (line) => {
       message: pending,
       code: projectId,
       entries: reasoning,
+      turnUsage: { ...turnUsage, model },
     });
   } catch {
     send({ type: "error", code: phase });

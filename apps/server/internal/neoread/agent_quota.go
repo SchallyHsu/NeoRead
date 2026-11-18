@@ -4,25 +4,72 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
+type quotaWindow struct {
+	ID          string  `json:"id"`
+	Label       string  `json:"label"`
+	UsedPercent float64 `json:"usedPercent"`
+	ResetsAt    int64   `json:"resetsAt,omitempty"`
+}
+type quotaBalance struct {
+	Label     string `json:"label"`
+	Remaining string `json:"remaining"`
+	Currency  string `json:"currency,omitempty"`
+}
+type accountQuota struct {
+	Status    string         `json:"status"`
+	CheckedAt int64          `json:"checkedAt"`
+	RetryAt   int64          `json:"retryAt,omitempty"`
+	Plan      string         `json:"plan,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Windows   []quotaWindow  `json:"windows"`
+	Balances  []quotaBalance `json:"balances,omitempty"`
+}
 type agentQuota struct {
-	Remaining *float64 `json:"remaining,omitempty"`
-	ResetsAt  string   `json:"resetsAt,omitempty"`
-	Error     string   `json:"error,omitempty"`
+	Account   *accountQuota `json:"account,omitempty"`
+	Remaining *float64      `json:"remaining,omitempty"`
+	ResetsAt  string        `json:"resetsAt,omitempty"`
+	Error     string        `json:"error,omitempty"`
 }
 
 func (s *Server) agentQuota(w http.ResponseWriter, r *http.Request) {
 	provider := r.URL.Query().Get("provider")
-	if provider != "codex" && provider != "claude" {
+	if provider != "codex" && provider != "claude" && !nativeProvider(provider) {
 		fail(w, http.StatusBadRequest, "不支持此 Agent 的额度查询")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	timeout := 15 * time.Second
+	if nativeProvider(provider) {
+		timeout = 32 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	started := time.Now()
-	quota, err := s.readPiQuota(ctx, provider)
+	var quota agentQuota
+	var err error
+	if nativeProvider(provider) {
+		model := r.URL.Query().Get("model")
+		if len(model) > 256 {
+			fail(w, 400, "模型名称过长")
+			return
+		}
+		cfg := s.aiConfig().NativeAgent
+		runID := id()
+		result, e := runPiOperation(ctx, s.Store.Root, "native-quota", runID, map[string]string{"runId": runID, "backend": strings.TrimPrefix(provider, "native:"), "model": model, "executable": cfg.Executables[provider]}, false, nil, nil)
+		err = e
+		if err == nil {
+			if result.Quota == nil || result.Quota.Account == nil {
+				err = generationError(ErrorProtocol, "额度查询未返回结果")
+			} else {
+				quota = *result.Quota
+			}
+		}
+	} else {
+		quota, err = s.readPiQuota(ctx, provider)
+	}
 	outcome, level := "success", slog.LevelInfo
 	var kind ErrorKind
 	if err != nil {

@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { spawn, execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createConnection, type Socket } from "node:net";
@@ -1794,7 +1794,7 @@ test.each([200, 400])(
     );
     const child = spawn(
       process.execPath,
-      ["--import", preload, "dist/main.mjs"],
+      ["--import", pathToFileURL(preload).href, "dist/main.mjs"],
       { cwd: root },
     );
     const exited = once(child, "exit");
@@ -1903,7 +1903,9 @@ test.each([
         if (${JSON.stringify(mode)} === "cancel") {
           const { promise, reject } = Promise.withResolvers();
           init.signal.addEventListener("abort", () => reject(new Error("fixture-secret")), {once:true});
-          process.kill(process.pid, "SIGINT");
+          // Windows kill(SIGINT) terminates Node without dispatching a signal event.
+          if (process.platform === "win32") process.emit("SIGINT");
+          else process.kill(process.pid, "SIGINT");
           await promise;
         }
         if (${JSON.stringify(mode)} === "redirect") throw new Error("redirect fixture-secret");
@@ -1915,7 +1917,7 @@ test.each([
     );
     const child = spawn(
       process.execPath,
-      ["--import", preload, "dist/main.mjs"],
+      ["--import", pathToFileURL(preload).href, "dist/main.mjs"],
       { cwd: root },
     );
     const exited = once(child, "exit");

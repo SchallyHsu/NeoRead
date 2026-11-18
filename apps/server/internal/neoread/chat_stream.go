@@ -217,6 +217,9 @@ func (s *Server) streamChat(ctx context.Context, cancel context.CancelFunc, w ht
 		}
 		in.Chat.settleTools(status)
 	}
+	if err == nil && in.Chat != nil && in.Chat.Usage == nil {
+		in.Chat.Usage = &turnUsage{Provider: config.Primary}
+	}
 	if err == nil {
 		if _, err = s.Store.Document(documentID); err != nil {
 			err = generationError(ErrorCanceled, "文档已不可用")
@@ -235,6 +238,15 @@ func (s *Server) streamChat(ctx context.Context, cancel context.CancelFunc, w ht
 			_ = out.send("error", map[string]string{"error": err.Error()})
 		}
 		return
+	}
+	if in.Chat != nil && in.Chat.SessionID != "" && config.NativeAgent != nil {
+		project := config.NativeAgent.project(config.Primary)
+		if project.Archive {
+			if err := s.archiveProjectTurn(project, config.Primary, in.Chat, result.Text); err != nil {
+				s.diagnosticEvent(slog.LevelWarn, "chat.project_archive_failed", "requestId", requestID, "provider", config.Primary)
+				_ = out.send("activity", map[string]string{"phase": "project", "message": "问答已保存在书库，项目 Markdown 写入失败，请检查目录权限。"})
+			}
+		}
 	}
 	finalErr = out.send("done", map[string]bool{"ok": true})
 }

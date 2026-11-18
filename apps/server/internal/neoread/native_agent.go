@@ -2,20 +2,29 @@ package neoread
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
+type agentProject struct {
+	Name      string `json:"name"`
+	Directory string `json:"directory"`
+	Archive   bool   `json:"archive"`
+}
 type nativeSettings struct {
-	Provider    string            `json:"provider"`
-	ProjectName string            `json:"projectName"`
-	Directory   string            `json:"directory"`
-	Executables map[string]string `json:"executables"`
+	Projects    map[string]agentProject `json:"projects,omitempty"`
+	Provider    string                  `json:"provider"`
+	ProjectName string                  `json:"projectName"`
+	Directory   string                  `json:"directory"`
+	Executables map[string]string       `json:"executables"`
 }
 
 func nativeProvider(p string) bool {
@@ -25,53 +34,88 @@ func nativeProvider(p string) bool {
 	}
 	return false
 }
-func (s *Server) nativeSettings() (nativeSettings, error) {
+func (s *Server) legacyNativeSettings() *nativeSettings {
 	cfg := nativeSettings{ProjectName: "NeoRead", Executables: map[string]string{}}
-	var raw string
-	err := s.Store.DB.QueryRow("SELECT value FROM settings WHERE key='native-agent'").Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return cfg, nil
+	if s.legacyNativeJSON != "" {
+		_ = json.Unmarshal([]byte(s.legacyNativeJSON), &cfg)
 	}
-	if err == nil {
-		err = json.Unmarshal([]byte(raw), &cfg)
-	}
-	return cfg, err
+	return &cfg
 }
+
+// Older clients still use this endpoint. Both interfaces edit the same config.
 func (s *Server) nativeConfig(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.nativeSettings()
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	c := s.readAIConfig()
 	if r.Method == "PUT" {
-		if !decode(w, r, &cfg) {
+		if !decode(w, r, c.NativeAgent) {
 			return
 		}
-		cfg.ProjectName = strings.TrimSpace(cfg.ProjectName)
-		if cfg.ProjectName == "" || len(cfg.ProjectName) > 200 || cfg.Directory != "" && !filepath.IsAbs(cfg.Directory) || cfg.Provider != "" && !nativeProvider(cfg.Provider) {
-			fail(w, 400, "请输入项目名称和有效的绝对目录")
+		if err := c.NativeAgent.validate(); err != nil {
+			fail(w, 400, err.Error())
 			return
 		}
-		for key, exe := range cfg.Executables {
-			if !nativeProvider(key) || exe != "" && !filepath.IsAbs(exe) {
-				fail(w, 400, "Agent 程序需要绝对路径")
-				return
-			}
+		if err := s.writeAIConfig(c); err != nil {
+			fail(w, 500, "无法保存 Agent 连接")
+			return
 		}
-		_, err = s.Store.DB.Exec("INSERT OR REPLACE INTO settings VALUES('native-agent',?)", jsonText(cfg))
 	}
-	if err != nil {
-		fail(w, 500, "无法读写原生 Agent 设置")
-		return
+	respond(w, 200, c.NativeAgent)
+}
+func (cfg *nativeSettings) validate() error {
+	cfg.ProjectName = strings.TrimSpace(cfg.ProjectName)
+	if cfg.ProjectName == "" || len(cfg.ProjectName) > 200 || cfg.Directory != "" && !filepath.IsAbs(cfg.Directory) || cfg.Provider != "" && !nativeProvider(cfg.Provider) {
+		return errors.New("请输入项目名称和有效的绝对目录")
 	}
-	respond(w, 200, cfg)
+	for key, exe := range cfg.Executables {
+		if !nativeProvider(key) || exe != "" && !filepath.IsAbs(exe) {
+			return errors.New("Agent 程序需要绝对路径")
+		}
+	}
+	for key, p := range cfg.Projects {
+		if (!nativeProvider(key) && !validAgent(key)) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || p.Directory != "" && !filepath.IsAbs(p.Directory) {
+			return errors.New("项目名称或项目工作目录无效")
+		}
+	}
+	return nil
+}
+func (cfg nativeSettings) project(provider string) agentProject {
+	if p, ok := cfg.Projects[provider]; ok {
+		return p
+	}
+	return agentProject{Name: cfg.ProjectName, Directory: cfg.Directory}
+}
+
+var nativeCommands = []struct{ id, command string }{
+	{"native:codex", "codex"}, {"native:claude-code", "claude"}, {"native:antigravity", "agy"}, {"native:deepseek-harness", "dsh"},
+}
+
+func nativeInstalled(command, override string) bool {
+	if override != "" {
+		command = override
+	}
+	found, err := exec.LookPath(command)
+	if err != nil && override == "" && command == "claude" {
+		home, _ := os.UserHomeDir()
+		found, err = exec.LookPath(filepath.Join(home, ".local", "bin", "claude"))
+	}
+	if err != nil || !filepath.IsAbs(found) {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		switch strings.ToLower(filepath.Ext(found)) {
+		case ".exe", ".com", ".cmd", ".bat":
+		default:
+			return false
+		}
+	}
+	return true
 }
 func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInput, emit func(ProviderEvent) error, notice func(string) error) (AIResult, error) {
 	chat := in.Chat
-	cwd := cfg.Directory
-	if cwd == "" {
-		folder := cfg.ProjectName
-		if !filepath.IsLocal(folder) || folder == "." || strings.ContainsAny(folder, `/\\<>:"|?*`) || strings.HasSuffix(folder, ".") || strings.HasSuffix(folder, " ") {
-			folder = "project-" + sourceKey(folder)[:16]
-		}
-		cwd = filepath.Join(s.Store.Root, "agent-projects", folder)
-	}
+	project := cfg.project(cfg.Provider)
+	cfg.ProjectName = project.Name
+	cwd := project.path(s.Store.Root)
 	key := sourceKey(cwd + "\x00" + cfg.ProjectName)
 	c, err := s.Store.documentConversation(ctx, chat.DocumentID, conversationProvider(chat.SessionID, cfg.Provider), key)
 	if err != nil {
@@ -138,6 +182,10 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInpu
 	if err = json.Unmarshal(done.Entries, &reasoning); err != nil {
 		return AIResult{}, err
 	}
+	if done.TurnUsage != nil {
+		done.TurnUsage.Provider = cfg.Provider
+		chat.Usage = done.TurnUsage
+	}
 	c.NativeID = done.ID
 	c.NativeProjectID = done.Code
 	c.ProjectNotice = done.Message
@@ -153,4 +201,34 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInpu
 		_ = notice(done.Message)
 	}
 	return AIResult{Provider: cfg.Provider, Text: done.Text, Reasoning: reasoning}, nil
+}
+
+func (p agentProject) path(root string) string {
+	cwd := p.Directory
+	if cwd == "" {
+		folder := p.Name
+		if !filepath.IsLocal(folder) || folder == "." || strings.ContainsAny(folder, `/\\<>:"|?*`) || strings.HasSuffix(folder, ".") || strings.HasSuffix(folder, " ") {
+			folder = "project-" + sourceKey(folder)[:16]
+		}
+		cwd = filepath.Join(root, "agent-projects", folder)
+	}
+	return cwd
+}
+
+// Only a completed visible turn is archived. Generated keys keep document text
+// out of filenames and make a repeated write of the same run idempotent.
+func (s *Server) archiveProjectTurn(p agentProject, provider string, chat *chatInput, answer string) error {
+	session, err := s.Store.chatSession(chat.DocumentID, chat.SessionID)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(p.path(s.Store.Root), "NeoRead Chats", strings.ReplaceAll(provider, ":", "-"), sourceKey(chat.DocumentID + "\x00" + chat.SessionID)[:20])
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	if chat.piRunID == "" {
+		return errors.New("missing turn identity")
+	}
+	text := fmt.Sprintf("# %s · %s\n\n## 提问\n\n%s\n\n## 回答\n\n%s\n", chat.Title, session.Title, chat.Question, answer)
+	return atomicFile(filepath.Join(dir, sourceKey(chat.piRunID)[:24]+".md"), []byte(text))
 }

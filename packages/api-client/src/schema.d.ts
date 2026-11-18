@@ -153,14 +153,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            provider: string;
-                            projectName: string;
-                            directory: string;
-                            executables: {
-                                [key: string]: string;
-                            };
-                        };
+                        "application/json": components["schemas"]["NativeAgentSettings"];
                     };
                 };
             };
@@ -175,14 +168,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        provider: string;
-                        projectName: string;
-                        directory: string;
-                        executables: {
-                            [key: string]: string;
-                        };
-                    };
+                    "application/json": components["schemas"]["NativeAgentSettings"];
                 };
             };
             responses: {
@@ -192,14 +178,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            provider: string;
-                            projectName: string;
-                            directory: string;
-                            executables: {
-                                [key: string]: string;
-                            };
-                        };
+                        "application/json": components["schemas"]["NativeAgentSettings"];
                     };
                 };
             };
@@ -3117,7 +3096,8 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    provider: "codex" | "claude";
+                    provider: "codex" | "claude" | "native:codex" | "native:claude-code" | "native:antigravity" | "native:deepseek-harness";
+                    model?: string;
                 };
                 header?: never;
                 path?: never;
@@ -3132,6 +3112,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            account?: components["schemas"]["AccountQuota"];
                             remaining?: number;
                             /** Format: date-time */
                             resetsAt?: string;
@@ -5635,6 +5616,7 @@ export interface components {
             location: components["schemas"]["DocumentLocation"];
         };
         Message: {
+            usage?: components["schemas"]["TurnUsage"];
             id: string;
             documentId: string;
             /** @enum {unknown} */
@@ -5674,11 +5656,11 @@ export interface components {
         };
         Provider: {
             /** @enum {string} */
-            id: "codex" | "claude" | "kimi" | "api";
+            id: "codex" | "claude" | "kimi" | "api" | "native:codex" | "native:claude-code" | "native:antigravity" | "native:deepseek-harness";
             /** @description Whether the connection is configured. */
             installed: boolean;
             /** @enum {string} */
-            authMethod?: "oauth";
+            authMethod?: "oauth" | "cli";
             authenticated: boolean;
             status: string;
         };
@@ -5881,7 +5863,51 @@ export interface components {
             /** @description An empty key with hasKey=true preserves the saved key only at the same address. */
             hasKey: boolean;
         };
+        AccountQuota: {
+            status: string;
+            checkedAt: number;
+            retryAt?: number;
+            plan?: string;
+            message?: string;
+            windows: {
+                id: string;
+                label: string;
+                usedPercent: number;
+                resetsAt?: number;
+            }[];
+            balances?: {
+                label: string;
+                remaining: string;
+                currency?: string;
+            }[];
+        };
+        TurnUsage: {
+            model?: string;
+            provider?: string;
+            estimated?: boolean;
+            inputTokens?: number;
+            outputTokens?: number;
+            contextUsed?: number;
+            contextSize?: number;
+            costUsd?: number;
+        };
+        NativeAgentSettings: {
+            provider: string;
+            projectName: string;
+            directory: string;
+            executables: {
+                [key: string]: string;
+            };
+            projects?: {
+                [key: string]: {
+                    name: string;
+                    directory: string;
+                    archive: boolean;
+                };
+            };
+        };
         AIConfig: {
+            nativeAgent?: components["schemas"]["NativeAgentSettings"];
             webSearch?: components["schemas"]["WebSearchConfig"];
             primary: string;
             models: {

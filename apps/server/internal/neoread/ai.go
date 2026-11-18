@@ -26,7 +26,16 @@ func (s *Server) providers(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, Provider{ID: name, AuthMethod: "oauth", Installed: connected, Authenticated: connected, Status: status})
 	}
-	respond(w, 200, append(out, apiProvider(config.API)))
+	out = append(out, apiProvider(config.API))
+	for _, agent := range nativeCommands {
+		installed := nativeInstalled(agent.command, config.NativeAgent.Executables[agent.id])
+		status := "未找到本机程序"
+		if installed {
+			status = "已检测到本机程序"
+		}
+		out = append(out, Provider{ID: agent.id, AuthMethod: "cli", Installed: installed, Status: status})
+	}
+	respond(w, 200, out)
 }
 
 // The API agent has nothing to install; a saved endpoint counts as installed

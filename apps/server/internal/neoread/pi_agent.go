@@ -42,6 +42,7 @@ type piCatalogModel struct {
 }
 
 type piEvent struct {
+	TurnUsage      *turnUsage                                           `json:"turnUsage,omitempty"`
 	Quota          *agentQuota                                          `json:"quota,omitempty"`
 	Phase          string                                               `json:"phase"`
 	UpstreamStatus int                                                  `json:"upstreamStatus"`
@@ -79,7 +80,7 @@ var piRuntimePaths = func() (node, worker string, err error) {
 
 func runPiOperation(ctx context.Context, root, operation, runID string, request any, durable bool, event func(piEvent) error, tool func(string, json.RawMessage) ([]any, error)) (piEvent, error) {
 	node, worker, err := piRuntimePaths()
-	if operation == "native" {
+	if operation == "native" || operation == "native-quota" {
 		node = "node"
 		nativeWorker := os.Getenv("NEOREAD_NATIVE_AGENT")
 		if nativeWorker == "" && worker != "" {
@@ -120,7 +121,7 @@ func runPiOperation(ctx context.Context, root, operation, runID string, request 
 	if err != nil {
 		return piEvent{}, err
 	}
-	if operation == "native" {
+	if operation == "native" || operation == "native-quota" {
 		cmd.Cancel = input.Close
 		cmd.WaitDelay = 5 * time.Second
 	}
@@ -129,7 +130,7 @@ func runPiOperation(ctx context.Context, root, operation, runID string, request 
 		return piEvent{}, err
 	}
 	if err = cmd.Start(); err != nil {
-		if operation == "native" {
+		if operation == "native" || operation == "native-quota" {
 			return piEvent{}, generationError(ErrorConfiguration, "无法启动原生 Agent 运行环境，请安装 Node.js 24.9 或更高版本")
 		}
 		return piEvent{}, generationError(ErrorConfiguration, "无法启动 pi 运行时")
@@ -215,7 +216,7 @@ func runPiOperation(ctx context.Context, root, operation, runID string, request 
 					return piEvent{}, err
 				}
 			}
-			if operation == "native" {
+			if operation == "native" || operation == "native-quota" {
 				hint := map[string]string{"executable": "找不到 Agent 程序，请检查设置中的路径和 Node.js 安装", "bridge": "ACP 桥接组件安装失败，请检查 npm 和网络连接", "handshake": "原生 Agent 握手失败，请检查 CLI 登录和版本", "images": "该 Agent 未声明图片输入能力", "project": "无法恢复原生项目，请检查客户端和项目目录"}[e.Code]
 				if hint == "" {
 					hint = "原生 Agent 未正常完成回答，请在对应客户端检查模型配置和账号"
@@ -440,6 +441,8 @@ func streamPiChat(ctx context.Context, c APIConnection, req completionRequest, i
 		}
 	}
 	workerCanContinue := false
+	var turnInput, turnOutput int64
+	var reported bool
 	complete, err := runPiWorker(ctx, root, request, func(e piEvent) error {
 		switch e.Type {
 		case "error":
@@ -501,7 +504,12 @@ func streamPiChat(ctx context.Context, c APIConnection, req completionRequest, i
 				tokens := &TokenCounts{InputTokens: u.Input + u.CacheRead + u.CacheWrite, OutputTokens: u.Output, TotalTokens: u.Input + u.CacheRead + u.CacheWrite + u.Output, CachedInputTokens: tokenCount(u.CacheRead), CacheWriteInputTokens: tokenCount(u.CacheWrite)}
 				if tokens.TotalTokens == 0 {
 					tokens = nil
+				} else {
+					turnInput += tokens.InputTokens
+					turnOutput += tokens.OutputTokens
+					reported = true
 				}
+
 				if err := in.UsageSink(UsageCall{ID: id(), Provider: in.UsageProvider, StartedAt: now(), FinishedAt: now(), Status: piUsageStatus(e.Status), Models: []ModelTokens{{Model: e.Model, Tokens: tokens}}}); err != nil {
 					return generationError(ErrorSave, "无法保存调用统计")
 				}
@@ -582,6 +590,18 @@ func streamPiChat(ctx context.Context, c APIConnection, req completionRequest, i
 			return GenerateResult{}, ctx.Err()
 		}
 		return GenerateResult{}, err
+	}
+	if reported || complete.TurnUsage != nil {
+		usage := complete.TurnUsage
+		if usage == nil {
+			usage = &turnUsage{}
+		}
+		usage.Provider = in.UsageProvider
+		if reported {
+			usage.Input = &turnInput
+			usage.Output = &turnOutput
+		}
+		in.Chat.Usage = usage
 	}
 	if a != nil {
 		if err = a.check(ctx); err != nil {

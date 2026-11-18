@@ -55,6 +55,7 @@ type Annotation struct {
 	Tags []string `json:"tags,omitempty"`
 }
 type Message struct {
+	Usage           *turnUsage        `json:"usage,omitempty"`
 	WebSearch       bool              `json:"webSearch,omitempty"`
 	Tools           []ToolActivity    `json:"tools,omitempty"`
 	WebSources      []WebSource       `json:"webSources,omitempty"`

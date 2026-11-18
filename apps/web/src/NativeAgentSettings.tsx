@@ -1,117 +1,145 @@
-import { useEffect, useState } from "react";
-import { api, type NativeAgentSettings } from "@neoread/api";
+import { useState } from "react";
+import type {
+  AIConfig,
+  AgentProject,
+  NativeAgentSettings,
+} from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
 import { Input } from "@neoread/ui/components/input";
+import { Checkbox } from "@neoread/ui/components/checkbox";
+import { providerLabel } from "./ProviderIdentity";
 
-export const nativeAgentLabels: Record<string, string> = {
-  "native:claude-code": "Claude Code",
-  "native:codex": "Codex",
-  "native:antigravity": "Antigravity",
-  "native:deepseek-harness": "DeepSeek Harness",
+export const nativeAgentIds = [
+  "native:codex",
+  "native:claude-code",
+  "native:antigravity",
+  "native:deepseek-harness",
+];
+export const isNativeAgent = (id: string) => nativeAgentIds.includes(id);
+export const readingAgent = (config?: AIConfig) =>
+  config?.nativeAgent?.provider || config?.primary || "";
+export const defaultNativeSettings: NativeAgentSettings = {
+  provider: "",
+  projectName: "NeoRead",
+  directory: "",
+  executables: {},
 };
-export function NativeAgentSettingsPanel({ open }: { open: boolean }) {
-  const [cfg, setCfg] = useState<NativeAgentSettings>();
+export function selectReadingAgent(config: AIConfig, id: string): AIConfig {
+  const prefs = config.nativeAgent ?? defaultNativeSettings;
+  return isNativeAgent(id)
+    ? { ...config, nativeAgent: { ...prefs, provider: id } }
+    : {
+        ...config,
+        primary: id,
+        ...(config.nativeAgent && { nativeAgent: { ...prefs, provider: "" } }),
+      };
+}
+export function AgentProjectForm({
+  provider,
+  settings,
+  disabled,
+  onSave,
+}: {
+  provider: string;
+  settings: NativeAgentSettings;
+  disabled: boolean;
+  onSave: (project: AgentProject, executable: string) => Promise<boolean>;
+}) {
+  const native = isNativeAgent(provider);
+  const [project, setProject] = useState<AgentProject>(
+    () =>
+      settings.projects?.[provider] ?? {
+        name: settings.projectName,
+        directory: settings.directory,
+        archive: false,
+      },
+  );
+  const [executable, setExecutable] = useState(
+    settings.executables[provider] || "",
+  );
   const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    if (open)
-      api
-        .nativeAgent?.()
-        .then((v) => {
-          if (alive) setCfg(v);
-        })
-        .catch((e) => {
-          if (alive) setStatus(e.message);
-        });
-    return () => {
-      alive = false;
-    };
-  }, [open]);
-  async function save() {
-    if (!cfg) return;
-    setBusy(true);
-    try {
-      setCfg(await api.saveNativeAgent(cfg));
-      window.dispatchEvent(new Event("native-agent-changed"));
-      setStatus("已保存");
-    } catch (e) {
-      setStatus((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const changed = (patch: Partial<AgentProject>) => {
+    setProject({ ...project, ...patch });
+    setStatus("");
+  };
   return (
-    <section className="mb-5 grid gap-2">
-      <h3 className="text-sm font-medium">阅读侧栏助手</h3>
-      {cfg && (
+    <form
+      className="grid gap-3 p-4"
+      aria-label={providerLabel(provider) + " 项目对话"}
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const ok = await onSave(
+          {
+            ...project,
+            name: project.name.trim(),
+            directory: project.directory.trim(),
+          },
+          executable.trim(),
+        );
+        setStatus(ok ? "项目设置已保存" : "项目设置保存失败");
+      }}
+    >
+      <h3 className="text-sm font-medium">项目对话</h3>
+      {native && (
+        <p className="text-xs text-muted-foreground">
+          使用本机已登录的 {providerLabel(provider)}，完成的对话自动保存到对应的
+          Agent 项目。
+        </p>
+      )}
+      {native && (
+        <label className="grid gap-1 text-sm">
+          助手程序路径
+          <Input
+            value={executable}
+            placeholder="留空自动检测"
+            onChange={(e) => {
+              setExecutable(e.target.value);
+              setStatus("");
+            }}
+          />
+        </label>
+      )}
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={project.archive}
+          onCheckedChange={(v) => changed({ archive: !!v })}
+        />
+        将完成的问答另存为项目 Markdown
+      </label>
+      {(native || project.archive) && (
         <>
-          <label>
-            对话方式{" "}
-            <select
-              value={cfg.provider}
-              onChange={(e) => {
-                setCfg({ ...cfg, provider: e.target.value });
-                setStatus("");
-              }}
-            >
-              <option value="">内置模型连接</option>
-              {Object.entries(nativeAgentLabels).map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
+          <label className="grid gap-1 text-sm">
+            项目名称
+            <Input
+              required
+              maxLength={120}
+              value={project.name}
+              onChange={(e) => changed({ name: e.target.value })}
+            />
           </label>
-          {cfg.provider && (
-            <>
-              <label>
-                原生项目名称
-                <Input
-                  value={cfg.projectName}
-                  onChange={(e) =>
-                    setCfg({ ...cfg, projectName: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                项目工作目录
-                <Input
-                  placeholder="留空使用书库内的独立项目目录"
-                  value={cfg.directory}
-                  onChange={(e) =>
-                    setCfg({ ...cfg, directory: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                助手程序路径
-                <Input
-                  placeholder="留空自动检测"
-                  value={cfg.executables[cfg.provider] || ""}
-                  onChange={(e) =>
-                    setCfg({
-                      ...cfg,
-                      executables: {
-                        ...cfg.executables,
-                        [cfg.provider]: e.target.value,
-                      },
-                    })
-                  }
-                />
-              </label>
-              <p className="text-xs text-muted-foreground">
-                使用本机已登录的 CLI，按项目保存会话。首次使用 Claude Code 或
-                Codex 会安装对应的 ACP 桥接组件。
-              </p>
-            </>
-          )}
-          <Button variant="outline" size="sm" disabled={busy} onClick={save}>
-            保存对话设置
-          </Button>
+          <label className="grid gap-1 text-sm">
+            项目工作目录
+            <Input
+              value={project.directory}
+              placeholder="留空使用当前书库的 agent-projects 目录"
+              onChange={(e) => changed({ directory: e.target.value })}
+            />
+          </label>
         </>
       )}
-      {status && <p role="status">{status}</p>}
-    </section>
+      {project.archive && (
+        <p className="text-xs text-muted-foreground">
+          每轮问答保存到工作目录下的 NeoRead Chats 文件夹。
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="outline" type="submit" disabled={disabled}>
+          保存项目设置
+        </Button>
+        <span role="status" className="text-xs">
+          {status}
+        </span>
+      </div>
+    </form>
   );
 }

@@ -5,3 +5,5 @@ The ACP client, session handling and native project helpers in this directory co
 On 2026-11-18 the SchallyHsu integration fork adapted the plugin’s test Node process adapter for the NeoRead worker in `node-spawner.ts`, including handling Windows npm command wrappers. The `agent/`, `helpers/` and `types.ts` sources were copied from the Chinese edition. The adjacent NeoRead worker hosts these components in the reading sidebar.
 
 These plugin sources and the adaptation retain the **GNU Affero General Public License, version 3 or later**. [License text](LICENSE) · [Source modification notice](https://github.com/SchallyHsu/zotero-agent-zh-CN/blob/457042a4b6f4767b37e314ef2b843d4f8e44f755/NOTICE.md)
+
+The read-only account quota adapters are from SchallyHsu/zotero-agent-zh-CN at commit 1326557 and retain the original license.

@@ -196,9 +196,8 @@ export type ChapterTranslationStatus =
 
 export interface WebDAVConfig { enabled:boolean; url:string; username:string; }
 export interface WebDAVStatus {at?:string;error?:string;uploaded:number;downloaded:number}
-export interface NativeAgentSettings {
-  provider:string; projectName:string; directory:string; executables:Record<string,string>;
-}
+import type { NativeAgentSettings } from "@neoread/core";
+export type { NativeAgentSettings } from "@neoread/core";
 export const api = {
  webdav:()=>request<WebDAVConfig & {status:WebDAVStatus}>("/api/webdav"),
  saveWebdav:(cfg:WebDAVConfig,password:string)=>request<WebDAVConfig & {status:WebDAVStatus}>("/api/webdav",{method:"PUT",body:JSON.stringify({...cfg,password})}),
@@ -566,10 +565,10 @@ export const api = {
     request<PDFBlock[]>(`/api/documents/${id}/blocks`, { signal }),
   aiConfig: (signal?: AbortSignal) =>
     request<AIConfig>("/api/ai/config", { signal }),
-  agentQuota: (provider: "codex" | "claude", signal?: AbortSignal) =>
+  agentQuota: (provider: string, signal?: AbortSignal, model="") =>
     request<
       paths["/api/ai/quota"]["get"]["responses"][200]["content"]["application/json"]
-    >(`/api/ai/quota?provider=${provider}`, { signal }),
+    >(`/api/ai/quota?${new URLSearchParams({provider,...(model && {model})})}`, { signal }),
   agentModels: (
     provider: string,
     signal?: AbortSignal,

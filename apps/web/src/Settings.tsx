@@ -24,7 +24,14 @@ import {
 import { LegacyAnnotationMigration } from "./LegacyAnnotationMigration";
 import { DiagnosticExport } from "./DiagnosticExport";
 import { PaperRefreshSettings } from "./PaperRefreshSettings";
-import { NativeAgentSettingsPanel } from "./NativeAgentSettings";
+import {
+  AgentProjectForm,
+  defaultNativeSettings,
+  nativeAgentIds,
+  isNativeAgent,
+  readingAgent,
+  selectReadingAgent,
+} from "./NativeAgentSettings";
 import { WebDAVSettings } from "./WebDAVSettings";
 import { LibraryLocationSettings } from "./LibraryLocationSettings";
 import { CommandLineSettings } from "./CommandLineSettings";
@@ -87,7 +94,7 @@ import { AppearancePicker } from "./AppearancePicker";
 import { AgentDeck, type DeckItem } from "./AgentDeck";
 import { recentAgentCalls } from "./agentUsage";
 // Checks run automatically for this many API models; the rest on demand.
-const agentConnections = ["codex", "claude", "kimi", "api"];
+const agentConnections = ["codex", "claude", "kimi", "api", ...nativeAgentIds];
 const autoAPIChecks = 12;
 const quotaDateTime = new Intl.DateTimeFormat("zh-CN", {
   year: "numeric",
@@ -343,7 +350,12 @@ export function Settings({
       // Built-in connections check their selected model; custom API checks each model.
       const pending = providers
         .filter((provider) => {
-          if (provider.id === "api" || !provider.installed) return false;
+          if (
+            provider.id === "api" ||
+            isNativeAgent(provider.id) ||
+            !provider.installed
+          )
+            return false;
           // Saved results survive dialog remounts and application restarts.
           // Only an explicit retry replaces an existing result, including failures.
           if (
@@ -359,7 +371,9 @@ export function Settings({
         })
         .map(({ id }) => id);
       // Initialize missing catalogs; only the Settings model picker checks expiry.
-      const catalogProviders = providers.filter(({ installed }) => installed);
+      const catalogProviders = providers.filter(
+        ({ id, installed }) => installed && !isNativeAgent(id),
+      );
       const results = await Promise.allSettled(
         catalogProviders.map(({ id }) => loadModelCatalog(id)),
       );
@@ -608,9 +622,9 @@ export function Settings({
         try {
           const latest = await api.aiConfig();
           setAIConfig(
-            latest.primary === next
+            readingAgent(latest) === next
               ? latest
-              : await api.saveAIConfig({ ...latest, primary: next }),
+              : await api.saveAIConfig(selectReadingAgent(latest, next)),
           );
           if (next === "api" && !pendingAgent.current)
             warnWithoutVision(apiModels);
@@ -687,22 +701,54 @@ export function Settings({
   };
   const openDetail = (id: string) => {
     const status = agentStatus(id);
+    if (isNativeAgent(id)) {
+      openPiConfig(id);
+      return false;
+    }
     if (status === "ready") return true;
     if (status === "pending") toast.info("正在检测 Agent，请稍候");
     else if (id === "api") toast.warning("请先配置 API Key");
     else openPiConfig(id);
     return false;
   };
+  const projectForm = (id: string) =>
+    config && (
+      <AgentProjectForm
+        key={id}
+        provider={id}
+        settings={config.nativeAgent ?? defaultNativeSettings}
+        disabled={saving}
+        onSave={async (project, executable) => {
+          const ok = await saveConfig((latest) => {
+            const prefs = latest.nativeAgent ?? defaultNativeSettings;
+            return {
+              ...latest,
+              nativeAgent: {
+                ...prefs,
+                projects: { ...prefs.projects, [id]: project },
+                executables: isNativeAgent(id)
+                  ? { ...prefs.executables, [id]: executable }
+                  : prefs.executables,
+              },
+            };
+          }, false);
+          if (ok && isNativeAgent(id))
+            setProviders(await api.providers().catch(() => providers));
+          return ok;
+        }}
+      />
+    );
   const deckItems: DeckItem[] = [
     ...agentConnections.map((name): DeckItem => {
       const capability = config?.capabilities[name];
       const ready = installed(name);
-      const selected = config?.primary === name;
+      const selected = readingAgent(config) === name;
       return {
         id: name,
         title: providerLabel(name),
-        subtitle:
-          !loading && !ready
+        subtitle: isNativeAgent(name)
+          ? "本机 CLI"
+          : !loading && !ready
             ? name === "api"
               ? "未配置"
               : "未连接"
@@ -710,8 +756,12 @@ export function Settings({
         icon: <ProviderIcon provider={name} size={40} />,
         status: agentStatus(name),
         selected,
-        checks:
-          name === "api"
+        sideStatus: isNativeAgent(name)
+          ? providers.find((p) => p.id === name)?.status
+          : undefined,
+        checks: isNativeAgent(name)
+          ? undefined
+          : name === "api"
             ? ready && apiCardStatus()
             : (testing.has(name) || ready || capability) &&
               checkStatus(name, capability),
@@ -1185,7 +1235,6 @@ export function Settings({
             )}
           </TabsContent>
           <TabsContent value="agent" className="settings-panel" keepMounted>
-            <NativeAgentSettingsPanel open={open} />
             <section
               data-tour="agent-section"
               data-deck-open={deckOpen}
@@ -1209,24 +1258,38 @@ export function Settings({
                 <AgentDeck
                   items={deckItems}
                   disabled={!config}
-                  front={config?.primary || deckFront}
+                  front={readingAgent(config) || deckFront}
                   open={deckOpen}
                   onOpenChange={setDeckOpen}
                   panel={
                     piDetails ? (
-                      <PiConnectionPanel
-                        key={piDetails}
-                        provider={piDetails}
-                        connected={installed(piDetails)}
-                        autoConnect={
-                          probed && !loading && !installed(piDetails)
-                        }
-                        onBack={() => setPiDetails(null)}
-                        onChange={() => {
-                          checked.current.clear();
-                          void refresh(true);
-                        }}
-                      />
+                      <div className="h-full overflow-y-auto">
+                        {isNativeAgent(piDetails) ? (
+                          <Button
+                            variant="ghost"
+                            aria-label="返回 Agent 设置"
+                            onClick={() => setPiDetails(null)}
+                          >
+                            <ChevronLeft />
+                            {providerLabel(piDetails)}
+                          </Button>
+                        ) : (
+                          <PiConnectionPanel
+                            key={piDetails}
+                            provider={piDetails}
+                            connected={installed(piDetails)}
+                            autoConnect={
+                              probed && !loading && !installed(piDetails)
+                            }
+                            onBack={() => setPiDetails(null)}
+                            onChange={() => {
+                              checked.current.clear();
+                              void refresh(true);
+                            }}
+                          />
+                        )}
+                        {projectForm(piDetails)}
+                      </div>
                     ) : apiDetails ? (
                       <div className="p-5" data-tour="api-panel">
                         <Button
@@ -1239,6 +1302,7 @@ export function Settings({
                           API 配置
                         </Button>
                         <div className="settings-panel" data-tour="api-details">
+                          {projectForm("api")}
                           <section data-tour="api-form">
                             {config && (
                               <APIAgentForm

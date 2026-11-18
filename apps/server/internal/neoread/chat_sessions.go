@@ -80,8 +80,12 @@ func (s *Server) listChatSessions(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "文档不存在")
 		return
 	}
-	provider := s.aiConfig().Primary
-	if !validAgent(provider) {
+	config := s.aiConfig()
+	provider := config.Primary
+	if config.NativeAgent != nil && nativeProvider(config.NativeAgent.Provider) {
+		provider = config.NativeAgent.Provider
+	}
+	if !nativeProvider(provider) && !validAgent(provider) {
 		provider = "api"
 	}
 	_, err = s.ensureChatSession(doc.ID, provider)
@@ -302,7 +306,7 @@ func visibleReasoning(reasoning string) string {
 }
 
 func (s *Store) saveChatAnswer(ctx context.Context, chat *chatInput, text, reasoning string) error {
-	message := Message{ID: id(), CreatedAt: now(), DocumentID: chat.DocumentID, SessionID: chat.SessionID, Role: "assistant", Content: text, Reasoning: visibleReasoning(reasoning), Tools: chat.toolSnapshot(), WebSources: chat.webSourcesSnapshot()}
+	message := Message{Usage: chat.Usage, ID: id(), CreatedAt: now(), DocumentID: chat.DocumentID, SessionID: chat.SessionID, Role: "assistant", Content: text, Reasoning: visibleReasoning(reasoning), Tools: chat.toolSnapshot(), WebSources: chat.webSourcesSnapshot()}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err

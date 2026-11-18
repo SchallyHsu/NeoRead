@@ -620,8 +620,8 @@ export function locationLabel(location?: DocumentLocation): string {
     : `章节进度 ${Math.round((location.progression ?? 0) * 100)}%`;
 }
 export interface Provider {
-  authMethod?: "oauth";
-  id: "codex" | "claude" | "kimi" | "api";
+  authMethod?: "oauth" | "cli";
+  id: "codex" | "claude" | "kimi" | "api" | "native:codex" | "native:claude-code" | "native:antigravity" | "native:deepseek-harness";
   installed: boolean;
   authenticated: boolean;
   status: string;
@@ -682,7 +682,9 @@ export interface WebSource {
   publishedAt?: string;
   truncated?: boolean;
 }
+export interface TurnUsage {model?:string;estimated?:boolean;provider?:string;inputTokens?:number;outputTokens?:number;costUsd?:number;contextUsed?:number;contextSize?:number}
 export interface Message {
+  usage?:TurnUsage;
   webSearch?: boolean;
   tools?: ToolActivity[];
   webSources?: WebSource[];
@@ -804,7 +806,20 @@ export interface WebSearchConfig {
   hasKey: boolean;
 }
 
+export interface AgentProject {
+  name: string;
+  directory: string;
+  archive: boolean;
+}
+export interface NativeAgentSettings {
+  provider: string;
+  projectName: string;
+  directory: string;
+  executables: Record<string,string>;
+  projects?: Record<string,AgentProject>;
+}
 export interface AIConfig {
+  nativeAgent?: NativeAgentSettings;
   /** Persistent search permissions and a search connection independent of the model. */
   webSearch?: WebSearchConfig;
   primary: string;

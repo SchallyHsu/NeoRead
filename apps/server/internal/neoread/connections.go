@@ -47,6 +47,7 @@ type Capability struct {
 	Fingerprint         string `json:"-"`
 }
 type AIConfig struct {
+	NativeAgent   *nativeSettings `json:"nativeAgent,omitempty"`
 	native        *nativeSettings
 	piConnections map[string]APIConnection
 	WebSearch     *WebSearchConfig             `json:"webSearch,omitempty"`
@@ -124,13 +125,18 @@ func (s *Server) readAIConfig() AIConfig {
 	c := AIConfig{piConnections: connections, Models: map[string]string{}, Capabilities: map[string]Capability{}}
 	b, err := os.ReadFile(filepath.Join(s.Store.Root, "ai-connections.json"))
 	if err != nil {
+		c.NativeAgent = s.legacyNativeSettings()
 		return c
 	}
 	var stored savedConfig
 	if json.Unmarshal(b, &stored) != nil {
+		c.NativeAgent = s.legacyNativeSettings()
 		return c
 	}
 	c = stored.Config
+	if c.NativeAgent == nil {
+		c.NativeAgent = s.legacyNativeSettings()
+	}
 	c.piConnections = connections
 	if c.Models == nil {
 		c.Models = map[string]string{}
@@ -358,6 +364,12 @@ func (s *Server) putAIConfig(w http.ResponseWriter, r *http.Request) {
 	defer s.configMu.Unlock()
 	old := s.readAIConfig()
 	c.piConnections = old.piConnections
+	if c.NativeAgent == nil {
+		c.NativeAgent = old.NativeAgent
+	} else if err := c.NativeAgent.validate(); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
 	if c.WebSearch == nil {
 		c.WebSearch = old.WebSearch
 	} else if err := mergeWebSearchConfig(c.WebSearch, old.WebSearch); err != nil {

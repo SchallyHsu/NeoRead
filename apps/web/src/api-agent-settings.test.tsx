@@ -614,3 +614,16 @@ it.each([
     await act(async () => useReaderStore.getState().setTheme(theme));
   }
 });
+
+it("opens native project settings inside the existing deck and selects the same reading provider", async()=>{
+ vi.mocked(api.providers).mockResolvedValue([{id:"native:codex",authMethod:"cli",installed:true,authenticated:false,status:"已检测到本机程序"}]);
+ await act(async()=>root.render(<Settings open onOpenChange={()=>{}}/>));
+ await expand();
+ await click('[aria-label="配置Codex"]');
+ expect(host.querySelector('form[aria-label="Codex 项目对话"]')).not.toBeNull();
+ expect(host.textContent).not.toContain("阅读侧栏助手");
+ await click('[aria-label="返回 Agent 设置"]');
+ await click('[data-agent="native:codex"] [role="radio"]');
+ expect(useReaderStore.getState().aiConfig?.nativeAgent?.provider).toBe("native:codex");
+ expect(vi.mocked(api.testAI).mock.calls.some(([p])=>p==="native:codex")).toBe(false);
+});
