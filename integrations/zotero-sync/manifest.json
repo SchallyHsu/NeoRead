@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "NeoRead 与 Zotero 同步",
+  "version": "0.1.1",
+  "description": "在一台桌面电脑上对接个人文库和私有 WebDAV 聊天。",
+  "homepage_url": "https://github.com/SchallyHsu/NeoRead",
+  "applications": {
+    "zotero": {
+      "id": "neoread-sync@schallyhsu",
+      "strict_min_version": "8.0",
+      "strict_max_version": "*",
+      "update_url": "https://raw.githubusercontent.com/SchallyHsu/NeoRead/main/integrations/zotero-sync/updates.json"
+    }
+  }
+}

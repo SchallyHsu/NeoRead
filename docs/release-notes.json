@@ -2210,6 +2210,10 @@
   ],
   "0.13.0": [
     {
+      "title": "整合版支持复用 Zotero 的 WebDAV 附件",
+      "body": "配套桌面扩展连接个人文库和按论文保存的聊天。其他电脑可从已有的 Zotero 附件包读取原文件，手机和平板可在私有 WebDAV 页面查看聊天。"
+    },
+    {
       "title": "模型连接改由内置 Pi 运行",
       "body": "ChatGPT、Claude、Kimi Code 账号与 API Key 连接统一由应用内置的 Pi 执行，不再调用本机安装的 Codex、Claude Code 或 Kimi CLI。浏览器授权完成后自动登录，无需粘贴回调地址；模型请求跟随应用的代理设置。已断开的连接可在卡片中直接重新连接，Claude 账号恢复显示每周额度。"
     },
