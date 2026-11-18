@@ -10,7 +10,7 @@
 
 NeoRead 阅读器由 [cynicalight 和上游贡献者](https://github.com/cynicalight/NeoRead) 开发。本仓库是 **SchallyHsu 维护的非官方整合分支**。Agent 通信和项目归档复用了 [Zotero Agent 中文版](https://github.com/SchallyHsu/zotero-agent-zh-CN) 的实现，其插件源自 [Zotero MCP](https://github.com/54yyyu/zotero-mcp)。
 
-本分支在原有 Agent 连接卡片中加入了 Claude Code、Codex、Antigravity 和 DeepSeek Harness。每个连接可以配置项目归档，阅读聊天中可以查看账号额度与上下文占用。自有 WebDAV 主机可同步 PDF、EPUB 和聊天。Windows 电脑可在发布页下载整合版和配套 Zotero 扩展。其他平台可使用下方的源码构建步骤。[下载 Windows 版和 Zotero 扩展](https://github.com/SchallyHsu/NeoRead/releases/tag/neoread-zotero-sync-0.1.6) · [跨应用与移动端同步说明](integrations/zotero-sync/README.md) · [双机配置指南](docs/native-agents-webdav.zh-CN.md) · [原创与来源声明](NOTICE.md)
+本分支在原有 Agent 连接卡片中加入了 Claude Code、Codex、Antigravity 和 DeepSeek Harness。每个连接可以配置项目归档，阅读聊天中可以查看账号额度与上下文占用。自有 WebDAV 主机可同步 PDF、EPUB 和聊天。Windows 电脑可在发布页下载整合版和配套 Zotero 扩展。其他平台可使用下方的源码构建步骤。[下载 Windows 版和 Zotero 扩展](https://github.com/SchallyHsu/NeoRead/releases/tag/neoread-zotero-sync-0.1.7) · [跨应用与移动端同步说明](integrations/zotero-sync/README.md) · [双机配置指南](docs/native-agents-webdav.zh-CN.md) · [原创与来源声明](NOTICE.md)
 
 一个本地优先的 EPUB / PDF AI 阅读器，用于阅读电子书与论文、对照译文、记录批注，以及结合原文向 AI 提问。
 

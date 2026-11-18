@@ -78,7 +78,6 @@ export function ReadingTextControls({
   const fonts = { installed, loading, loadFonts };
   const zoom = typeof theme.zoom === "number" ? theme.zoom : undefined;
   const translationSize = theme.translationFontSize ?? 1;
-  const assistantSize = theme.assistantFontScale ?? 1;
   // Reflowed PDF text renders its source like EPUB text, so it takes the same
   // source font settings.
   const reflowed = docType === "epub" || theme.textReflow === true;
@@ -200,22 +199,7 @@ export function ReadingTextControls({
           }
           fonts={fonts}
         />
-        <SizeRow
-          label="Agent 字号"
-          min={80}
-          max={160}
-          value={Math.round(assistantSize * 100)}
-          onValue={(value) => setTheme({ assistantFontScale: value / 100 })}
-          action={
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setTheme({ assistantFontScale: 1 })}
-            >
-              恢复
-            </Button>
-          }
-        />
+        <AssistantFontSizeRow theme={theme} setTheme={setTheme} />
       </Section>
       {showLayout && (
         <>
@@ -269,6 +253,37 @@ export function ReadingTextControls({
         </>
       )}
     </div>
+  );
+}
+
+export function AssistantFontSizeRow({
+  theme,
+  setTheme,
+  title = "字号",
+}: {
+  theme: ReaderTheme;
+  setTheme: SetTheme;
+  title?: string;
+}) {
+  return (
+    <SizeRow
+      label="Agent 字号"
+      title={title}
+      min={80}
+      max={200}
+      value={Math.round((theme.assistantFontScale ?? 1) * 100)}
+      onValue={(value) => setTheme({ assistantFontScale: value / 100 })}
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          aria-label="恢复 Agent 默认字号"
+          onClick={() => setTheme({ assistantFontScale: 1 })}
+        >
+          恢复
+        </Button>
+      }
+    />
   );
 }
 

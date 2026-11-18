@@ -92,6 +92,7 @@ import {
 } from "./papers/columns";
 import { openExternalLink } from "./reading-links";
 import { AppearancePicker } from "./AppearancePicker";
+import { AssistantFontSizeRow } from "./ReadingTextControls";
 import { AgentDeck, type DeckItem } from "./AgentDeck";
 import { recentAgentCalls } from "./agentUsage";
 // Checks run automatically for this many API models; the rest on demand.
@@ -896,6 +897,9 @@ export function Settings({
                 setTheme={setTheme}
                 layout="settings"
               />
+            </section>
+            <section className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4">
+              <AssistantFontSizeRow theme={theme} setTheme={setTheme} title="Agent 字号" />
             </section>
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3 text-sm">
