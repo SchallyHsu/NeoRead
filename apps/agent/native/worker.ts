@@ -158,12 +158,15 @@ lines.on("line", async (line) => {
     });
     if (translation && r.backend === "deepseek-harness")
       childEnv.DSH_PERMISSION_MODE = "read-only";
-    if (r.backend === "codex")
+    if (r.backend === "codex") {
+      // Without CODEX_PATH the bridge runs its bundled CLI, which can have an older model catalog.
+      childEnv.CODEX_PATH = cli;
       childEnv.CODEX_CONFIG = JSON.stringify({
         sandbox_mode: "read-only",
         approval_policy: "never",
         web_search: "disabled",
       });
+    }
     const client = await AcpClient.spawn({
       spawner,
       command,

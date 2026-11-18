@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { backendOf } from "./zotero/agent/backends";
 import { cp } from "node:fs/promises";
 
 it("streams a DSH turn over ACP and queues the same project session on resume", async () => {
@@ -118,3 +119,54 @@ readline.createInterface({input:process.stdin}).on("line",line=>{
     await rm(tmp, { recursive: true, force: true });
   }
 }, 30000);
+
+it("discovers Codex efforts with the selected executable, including when the parent names another CLI", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "neoread-codex-"));
+  try {
+    const worker = path.join(tmp, "worker.mjs");
+    const spec = backendOf("codex");
+    const bridge = path.join(tmp, "node_modules", spec.pkg);
+    await mkdir(bridge, { recursive: true });
+    await build({
+      entryPoints: [fileURLToPath(new URL("./worker.ts", import.meta.url))],
+      outfile: worker,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+    });
+    await writeFile(path.join(bridge, "package.json"), JSON.stringify({ version: spec.version, bin: "acp.mjs" }));
+    await writeFile(path.join(bridge, "acp.mjs"), `
+import { createInterface } from "node:readline";
+const levels = process.env.CODEX_PATH === process.execPath ? ["low", "high", "ultra"] : ["high"];
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method } = JSON.parse(line);
+  if (id === undefined) continue;
+  const result = method === "initialize" ? { protocolVersion: 1, agentCapabilities: {} }
+    : method === "session/new" ? { sessionId: "catalog", models: { currentModelId: "sample[high]",
+      availableModels: levels.map(level => ({ modelId: "sample[" + level + "]", name: "Sample" })) } } : {};
+  console.log(JSON.stringify({ jsonrpc: "2.0", id, result }));
+}`);
+    const child = spawn(process.execPath, [worker], {
+      cwd: tmp,
+      env: { ...process.env, CODEX_PATH: "older-codex" },
+      windowsHide: true,
+    });
+    const closed = new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+    let output = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => (output += chunk));
+    child.stdin.write(JSON.stringify({
+      type: "native-catalog",
+      input: { runId: "test", backend: "codex", bridgeDir: tmp, executable: process.execPath },
+    }) + "\n");
+    expect(await closed).toBe(0);
+    const result = JSON.parse(output.trim().split(/\r?\n/).at(-1)!);
+    expect(result).toMatchObject({ type: "complete", models: [
+      { id: "sample", nativeEfforts: [{ id: "low" }, { id: "high" }, { id: "ultra" }] },
+    ] });
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
+}, 30_000);
