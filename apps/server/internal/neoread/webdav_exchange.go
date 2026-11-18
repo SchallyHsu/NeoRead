@@ -156,7 +156,7 @@ func (s *Server) publishFile(ctx context.Context, d *davClient, doc Document, na
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-	if hash != "" && names["file-"+hash+"."+doc.Type] {
+	if hash != "" && (names["file-"+hash+"."+doc.Type] || len(d.zotero[hash]) > 0) {
 		return hash, nil
 	}
 	f, err := os.Open(s.Store.File(doc))
@@ -171,7 +171,7 @@ func (s *Server) publishFile(ctx context.Context, d *davClient, doc Document, na
 	}
 	hash = hex.EncodeToString(h.Sum(nil))
 	name := "file-" + hash + "." + doc.Type
-	if !names[name] {
+	if !names[name] && len(d.zotero[hash]) == 0 {
 		if _, err = f.Seek(0, 0); err != nil {
 			return "", err
 		}
@@ -248,19 +248,26 @@ func (s *Server) pullDocument(ctx context.Context, d *davClient, doc davDocument
 		return exists, err
 	}
 	name := "file-" + doc.Hash + "." + doc.Type
-	if !names[name] {
+	if !names[name] && len(d.zotero[doc.Hash]) == 0 {
 		return false, nil
 	}
-	stream, err := d.get(ctx, name)
-	if err != nil {
-		return false, err
-	}
-	defer stream.Close()
 	f, err := os.CreateTemp(s.Store.Root, "dav-import-*")
 	if err != nil {
 		return false, err
 	}
 	defer os.Remove(f.Name())
+	var stream io.ReadCloser
+	if len(d.zotero[doc.Hash]) > 0 {
+		stream, err = d.zoteroOriginal(ctx, s.Store.Root, doc.Hash)
+	}
+	if stream == nil && names[name] {
+		stream, err = d.get(ctx, name)
+	}
+	if err != nil {
+		f.Close()
+		return false, err
+	}
+	defer stream.Close()
 	h := sha256.New()
 	size, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(stream, maxImportBytes+1))
 	closeErr := f.Close()

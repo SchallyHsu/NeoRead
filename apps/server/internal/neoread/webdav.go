@@ -162,13 +162,17 @@ type davClient struct {
 	cfg      davConfig
 	password string
 	http     *http.Client
+	zotero   map[string][]string
 }
 
 func newDAV(c davConfig, password string) *davClient {
-	return &davClient{c, password, &http.Client{Timeout: 10 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	return &davClient{cfg: c, password: password, http: &http.Client{Timeout: 10 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
 func (d *davClient) request(ctx context.Context, method, name string, body io.Reader, size int64) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, d.cfg.URL+"/neoread-v1/"+name, body)
+	return d.requestAt(ctx, method, "neoread-v1/"+name, body, size)
+}
+func (d *davClient) requestAt(ctx context.Context, method, relative string, body io.Reader, size int64) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, d.cfg.URL+"/"+relative, body)
 	if err != nil {
 		return nil, errors.New("WebDAV 地址无效")
 	}
@@ -225,13 +229,23 @@ func (d *davClient) list(ctx context.Context) (map[string]bool, error) {
 		return nil, errors.New("无法读取 WebDAV 文件列表")
 	}
 	names := map[string]bool{}
+	hasSources := false
 	for _, ent := range listing.Entries {
 		u, e := url.Parse(ent.Href)
 		if e == nil {
 			name := path.Base(u.Path)
+			if name == "zotero-sources-v1.json" {
+				hasSources = true
+			}
 			if davName.MatchString(name) {
 				names[name] = true
 			}
+		}
+	}
+	d.zotero = nil
+	if hasSources {
+		if err := d.readZoteroSources(ctx); err != nil {
+			return nil, err
 		}
 	}
 	return names, nil
