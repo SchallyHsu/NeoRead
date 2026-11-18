@@ -15,6 +15,30 @@ import { useReaderStore } from "./store";
 
 const AUTO = "";
 
+// DSH can offer the same model through several accounts. Its opaque ID is
+// a JSON pair [route, model]; keep the whole ID for requests.
+function nativeModelLabel(provider: string, id: string, models: AgentModel[]) {
+  const model = models.find((entry) => entry.id === id);
+  const name = model?.name || id;
+  if (
+    provider === "native:deepseek-harness" &&
+    (!model || models.some((other) => other.id !== id && other.name === name))
+  ) {
+    try {
+      const route: unknown = JSON.parse(id);
+      if (
+        Array.isArray(route) &&
+        typeof route[0] === "string" &&
+        typeof route[1] === "string"
+      )
+        return (model?.name || route[1]) + " · " + route[0];
+    } catch {
+      /* Older DSH versions may use a plain model ID. */
+    }
+  }
+  return name;
+}
+
 // A native agent offers models during its own ACP handshake. Open the catalog
 // on demand so merely reading a PDF does not start a CLI or create a session.
 export function NativeChatModel({
@@ -44,14 +68,21 @@ export function NativeChatModel({
   const effort = aiConfig?.[effortField]?.[provider]?.[effortModel] || AUTO;
   const target = effortModel || lastModel || "";
   const [open, setOpen] = useState(false);
-  const [models, setModels] = useState<AgentModel[]>([]);
+  const [catalog, setCatalog] = useState<{
+    provider: string;
+    executable: string;
+    models: AgentModel[];
+  }>();
+  const models =
+    catalog?.provider === provider && catalog.executable === executable
+      ? catalog.models
+      : [];
+  const probe = open || discover;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    setModels([]);
     setError("");
-    const probe = open || discover;
     setLoading(probe);
     void api
       .agentModels(
@@ -62,7 +93,10 @@ export function NativeChatModel({
         target || undefined,
       )
       .then((list) => {
-        if (!controller.signal.aborted) setModels(list);
+        // A cache miss for a newly selected model means its efforts have not
+        // been probed yet. The known model options still belong to this CLI.
+        if (!controller.signal.aborted && (probe || list.length))
+          setCatalog({ provider, executable, models: list });
       })
       .catch((cause: Error) => {
         if (!controller.signal.aborted) setError(cause.message);
@@ -71,8 +105,10 @@ export function NativeChatModel({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [provider, executable, open, discover, target]);
+  }, [provider, executable, probe, target]);
 
+  // Base UI also emits changes when an asynchronous option list changes. Only
+  // a user committing an option may write to the shared AI configuration.
   const choose = async (kind: "model" | "effort", value: string | null) => {
     if (
       value === null ||
@@ -118,14 +154,15 @@ export function NativeChatModel({
   };
   const name = providerLabel(provider);
   const chosen = models.find((model) => model.id === selected);
-  const defaultModel = models.find((model) => model.isDefault)?.name;
+  const defaultId = models.find((model) => model.isDefault)?.id;
+  const labelFor = (id: string) => nativeModelLabel(provider, id, models);
+  const defaultModel = defaultId ? labelFor(defaultId) : undefined;
   const current = target
     ? models.find((model) => model.id === target)
     : models.find((model) => model.isDefault);
   const levels = current?.nativeEfforts ?? [];
   const automaticLabel = lastModel
-    ? "跟随会话 · " +
-      (models.find((model) => model.id === lastModel)?.name || lastModel)
+    ? "跟随会话 · " + labelFor(lastModel)
     : defaultModel
       ? "默认 · " + defaultModel
       : "跟随会话模型";
@@ -135,7 +172,9 @@ export function NativeChatModel({
         value={selected}
         disabled={disabled || aiModelSaving}
         onOpenChange={setOpen}
-        onValueChange={(value) => void choose("model", value)}
+        onValueChange={(value, details) => {
+          if (details.reason === "item-press") void choose("model", value);
+        }}
       >
         <SelectTrigger
           className="model-select-trigger min-w-0 max-w-full"
@@ -144,11 +183,10 @@ export function NativeChatModel({
           <ProviderIcon provider={provider} size={18} />
           <SelectValue className="min-w-0 truncate">
             {name} ·{" "}
-            {chosen?.name ||
-              selected ||
+            {(selected && labelFor(selected)) ||
               (task === "translation"
                 ? "跟随问答 · " +
-                  (current?.name || target || defaultModel || "默认模型")
+                  ((target && labelFor(target)) || defaultModel || "默认模型")
                 : automaticLabel)}
           </SelectValue>
         </SelectTrigger>
@@ -157,8 +195,12 @@ export function NativeChatModel({
             {task === "translation" ? "跟随问答模型" : "跟随 Agent 会话模型"}
           </SelectItem>
           {models.map((model) => (
-            <SelectItem key={model.id} value={model.id} label={model.name}>
-              {model.name}
+            <SelectItem
+              key={model.id}
+              value={model.id}
+              label={labelFor(model.id)}
+            >
+              {labelFor(model.id)}
               {model.isDefault ? "（新会话默认）" : ""}
             </SelectItem>
           ))}
@@ -194,7 +236,9 @@ export function NativeChatModel({
         value={effort}
         disabled={disabled || aiModelSaving}
         onOpenChange={setOpen}
-        onValueChange={(value) => void choose("effort", value)}
+        onValueChange={(value, details) => {
+          if (details.reason === "item-press") void choose("effort", value);
+        }}
       >
         <SelectTrigger
           className="shrink-0"

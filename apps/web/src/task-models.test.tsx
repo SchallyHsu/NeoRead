@@ -72,8 +72,11 @@ afterEach(async () => {
 const trigger = (label: string) =>
   host.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
 async function choose(label: string, text: string) {
-  await act(async () => trigger(label).click());
-  const option = Array.from(document.querySelectorAll('[role="option"]')).find(
+  const button = trigger(label);
+  await act(async () => button.click());
+  const list = document.getElementById(button.getAttribute("aria-controls")!);
+  expect(list).toBeTruthy();
+  const option = Array.from(list!.querySelectorAll('[role="option"]')).find(
     (item) => (item.getAttribute("aria-label") ?? item.textContent) === text,
   ) as HTMLElement;
   expect(option).toBeDefined();
@@ -279,4 +282,103 @@ it("keeps separate native chat and translation effort per effective model", asyn
   expect(trigger("DeepSeek Harness 翻译推理强度").textContent).toContain("自动强度");
   await choose("DeepSeek Harness 翻译模型","跟随问答模型");
   expect(trigger("DeepSeek Harness 翻译推理强度").textContent).toContain("Max");
+});
+
+
+it("keeps the clicked sidebar model when its effort catalog has not been cached", async () => {
+  const provider = "native:deepseek-harness";
+  config.nativeAgent = {
+    provider,
+    executables: {},
+    projectName: "Reading",
+    directory: "",
+  };
+  useReaderStore.setState({ aiConfig: config });
+  let resolveRefresh!: (list: AgentModel[]) => void;
+  vi.mocked(api.agentModels).mockImplementation(
+    async (_provider, _signal, _refresh, cached, target) => {
+      if (!target) return models;
+      if (cached) return [];
+      return new Promise<AgentModel[]>((resolve) => {
+        resolveRefresh = resolve;
+      });
+    },
+  );
+  await act(async () =>
+    root.render(<NativeChatModel provider={provider} disabled={false} />),
+  );
+  await choose("DeepSeek Harness 问答模型", "Sonnet");
+  const button = trigger("DeepSeek Harness 问答模型");
+  expect(config.models[provider]).toBe("sonnet");
+  expect(button.textContent).toContain("Sonnet");
+  await act(async () => button.click());
+  expect(
+    document.querySelector('[role="option"][aria-selected="true"]')
+      ?.textContent,
+  ).toContain("Sonnet");
+  await act(async () => resolveRefresh(models));
+  expect(config.models[provider]).toBe("sonnet");
+  expect(api.saveAIConfig).toHaveBeenCalledTimes(1);
+});
+
+it("distinguishes identical DSH names and saves the exact route the reader clicked", async () => {
+  const provider = "native:deepseek-harness";
+  const official = JSON.stringify(["deepseek-official", "m"]);
+  const account = JSON.stringify(["deepseek-account", "m"]);
+  config.nativeAgent = {
+    provider,
+    executables: {},
+    projectName: "Reading",
+    directory: "",
+  };
+  config.models[provider] = official;
+  useReaderStore.setState({ aiConfig: config });
+  vi.mocked(api.agentModels).mockResolvedValue(
+    [official, account].map((id) => ({
+      id,
+      name: "DeepSeek Pro",
+      description: "",
+      isDefault: id === official,
+    })),
+  );
+  await act(async () =>
+    root.render(<NativeChatModel provider={provider} disabled={false} />),
+  );
+  await choose("DeepSeek Harness 问答模型", "DeepSeek Pro · deepseek-account");
+  expect(trigger("DeepSeek Harness 问答模型").textContent).toContain(
+    "DeepSeek Pro · deepseek-account",
+  );
+  expect(config.models[provider]).toBe(account);
+});
+
+it("never writes the initial model back when an open menu receives a partial catalog", async () => {
+  const provider = "native:claude-code";
+  config.nativeAgent = {
+    provider,
+    executables: {},
+    projectName: "Reading",
+    directory: "",
+  };
+  config.models[provider] = "opus";
+  useReaderStore.setState({ aiConfig: config });
+  let finish!: (list: AgentModel[]) => void;
+  vi.mocked(api.agentModels).mockImplementation(
+    async (_provider, _signal, _refresh, _cached, target) => {
+      if (target === "sonnet")
+        return new Promise<AgentModel[]>((resolve) => {
+          finish = resolve;
+        });
+      return models;
+    },
+  );
+  await act(async () =>
+    root.render(<NativeChatModel provider={provider} disabled={false} />),
+  );
+  await choose("Claude Code 问答模型", "Sonnet");
+  await act(async () => trigger("Claude Code 问答模型").click());
+  await act(async () =>
+    finish(models.filter((model) => model.id !== "sonnet")),
+  );
+  expect(config.models[provider]).toBe("sonnet");
+  expect(api.saveAIConfig).toHaveBeenCalledTimes(1);
 });
