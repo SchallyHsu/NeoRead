@@ -25,18 +25,24 @@ type AgentModel struct {
 
 func (s *Server) agentModels(w http.ResponseWriter, r *http.Request) {
 	provider := r.URL.Query().Get("provider")
+	if nativeProvider(provider) {
+		ctx, cancel := context.WithTimeout(r.Context(), nativeCatalogTimeout)
+		defer cancel()
+		models, err := s.nativeModelCatalog(catalogRequestContext(ctx, r), provider)
+		if err != nil {
+			fail(w, 502, "无法读取本机 Agent 模型列表："+err.Error())
+			return
+		}
+		respond(w, 200, models)
+		return
+	}
 	if !validAgent(provider) {
 		fail(w, 400, "请选择有效的 Agent SDK")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	if r.URL.Query().Get("refresh") == "true" {
-		ctx = context.WithValue(ctx, refreshModelCatalogKey{}, true)
-	}
-	if r.URL.Query().Get("cached") == "true" {
-		ctx = context.WithValue(ctx, cachedModelsOnlyKey{}, true)
-	}
+	ctx = catalogRequestContext(ctx, r)
 	if provider == "api" {
 		models, err := s.apiAgentModels(ctx, s.aiConfig())
 		if err != nil {
@@ -52,4 +58,14 @@ func (s *Server) agentModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, 200, taskRecommendations(provider, models))
+}
+
+func catalogRequestContext(ctx context.Context, r *http.Request) context.Context {
+	if r.URL.Query().Get("refresh") == "true" {
+		ctx = context.WithValue(ctx, refreshModelCatalogKey{}, true)
+	}
+	if r.URL.Query().Get("cached") == "true" {
+		ctx = context.WithValue(ctx, cachedModelsOnlyKey{}, true)
+	}
+	return ctx
 }

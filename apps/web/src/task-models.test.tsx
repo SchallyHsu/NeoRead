@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "@neoread/api";
 import type { AIConfig, AgentModel } from "@neoread/core";
+import { NativeChatModel } from "./NativeChatModel";
 import { TaskModels, taskChoice } from "./TaskModels";
 import { useReaderStore } from "./store";
 vi.mock("@neoread/api", () => ({
@@ -245,4 +246,17 @@ it("reloads the catalog after detection while retaining the selected model", asy
   expect(useReaderStore.getState().aiConfig?.primary).toBe("claude");
   await act(async () => resolve(models));
   expect(api.saveAIConfig).not.toHaveBeenCalled();
+});
+
+it("uses the CLI's own default and saves and resets its model without changing another agent", async () => {
+  const provider = "native:claude-code";
+  config.nativeAgent = { provider, executables: {}, projectName: "Reading", directory: "" };
+  useReaderStore.setState({ aiConfig: config });
+  await act(async () => root.render(<NativeChatModel provider={provider} disabled={false} discover />));
+  expect(trigger("Claude Code 问答模型").textContent).toContain("默认 · Opus");
+  await choose("Claude Code 问答模型", "Sonnet");
+  expect(config.models).toEqual({ claude: "opus", [provider]: "sonnet" });
+  await choose("Claude Code 问答模型", "跟随 Agent 会话模型");
+  expect(config.models).toEqual({ claude: "opus", [provider]: "" });
+  expect(config.primary).toBe("claude");
 });

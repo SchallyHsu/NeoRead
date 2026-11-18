@@ -192,7 +192,7 @@ func (s *Server) streamChat(ctx context.Context, cancel context.CancelFunc, w ht
 	var result AIResult
 	var err error
 	if config.native != nil {
-		result, err = s.nativeAnswer(ctx, *config.native, in, emit, func(message string) error {
+		result, err = s.nativeAnswer(ctx, *config.native, config.Models[config.native.Provider], in, emit, func(message string) error {
 			return out.send("activity", map[string]string{"phase": "project", "message": message})
 		})
 	} else {

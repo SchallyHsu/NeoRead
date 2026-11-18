@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 type agentProject struct {
@@ -111,7 +112,53 @@ func nativeInstalled(command, override string) bool {
 	}
 	return true
 }
-func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInput, emit func(ProviderEvent) error, notice func(string) error) (AIResult, error) {
+
+// Native workers share a bridge installation until the ACP handshake completes.
+func (s *Server) lockNativeStartup(backend string) func() {
+	var index int
+	switch backend {
+	case "codex":
+	case "claude-code":
+		index = 1
+	default:
+		return func() {}
+	}
+	lock := &s.nativeStartup[index]
+	lock.Lock()
+	return sync.OnceFunc(lock.Unlock)
+}
+
+func (s *Server) nativeModelCatalog(ctx context.Context, provider string) ([]AgentModel, error) {
+	backend := strings.TrimPrefix(provider, "native:")
+	executable := s.aiConfig().NativeAgent.Executables[provider]
+	return s.cachedCatalog(ctx, provider+"\x00"+executable, func(ctx context.Context) ([]AgentModel, error) {
+		release := s.lockNativeStartup(backend)
+		defer release()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		runID := id()
+		result, err := runPiOperation(ctx, s.Store.Root, "native-catalog", runID, map[string]string{
+			"runId": runID, "backend": backend, "executable": executable,
+			"bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend),
+		}, false, func(e piEvent) error {
+			if e.Type == "activity" {
+				release()
+			}
+			return nil
+		}, nil)
+		if err != nil {
+			return nil, err
+		}
+		models := make([]AgentModel, 0, len(result.Models))
+		for _, entry := range result.Models {
+			models = append(models, entry.AgentModel)
+		}
+		return models, nil
+	})
+}
+
+func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, model string, in AIInput, emit func(ProviderEvent) error, notice func(string) error) (AIResult, error) {
 	chat := in.Chat
 	project := cfg.project(cfg.Provider)
 	cfg.ProjectName = project.Name
@@ -138,28 +185,11 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInpu
 		images = append(images, map[string]string{"mime": "image/png", "data": base64.StdEncoding.EncodeToString(data)})
 	}
 	backend := strings.TrimPrefix(cfg.Provider, "native:")
-	req := map[string]any{"runId": chat.piRunID, "backend": backend, "cwd": cwd, "projectName": cfg.ProjectName, "title": session.Title, "resume": c.NativeID, "projectId": c.NativeProjectID, "prompt": prompt, "images": images, "executable": cfg.Executables[cfg.Provider], "bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend)}
-	// Each worker has its own JS runtime. Serialize startup for a shared npm
-	// prefix until the worker has loaded its bridge, then allow parallel turns.
-	var release = func() {}
-	if backend == "codex" || backend == "claude-code" {
-		slot := 0
-		if backend == "claude-code" {
-			slot = 1
-		}
-		lock := &s.nativeStartup[slot]
-		lock.Lock()
-		released := false
-		release = func() {
-			if !released {
-				released = true
-				lock.Unlock()
-			}
-		}
-		defer release()
-		if err := ctx.Err(); err != nil {
-			return AIResult{}, err
-		}
+	req := map[string]any{"runId": chat.piRunID, "backend": backend, "model": model, "cwd": cwd, "projectName": cfg.ProjectName, "title": session.Title, "resume": c.NativeID, "projectId": c.NativeProjectID, "prompt": prompt, "images": images, "executable": cfg.Executables[cfg.Provider], "bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend)}
+	release := s.lockNativeStartup(backend)
+	defer release()
+	if err := ctx.Err(); err != nil {
+		return AIResult{}, err
 	}
 	done, err := runPiOperation(ctx, s.Store.Root, "native", chat.piRunID, req, false, func(e piEvent) error {
 		switch e.Type {

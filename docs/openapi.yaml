@@ -3335,7 +3335,7 @@
                     "schema":
                       {
                         "type": "string",
-                        "enum": ["codex", "claude", "kimi", "api"],
+                        "enum": ["codex", "claude", "kimi", "api", "native:codex", "native:claude-code", "native:antigravity", "native:deepseek-harness"],
                       },
                   },
                   {

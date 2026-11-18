@@ -36,6 +36,7 @@ import { WebDAVSettings } from "./WebDAVSettings";
 import { LibraryLocationSettings } from "./LibraryLocationSettings";
 import { CommandLineSettings } from "./CommandLineSettings";
 import { ProviderIcon, providerLabel } from "./ProviderIdentity";
+import { NativeChatModel } from "./NativeChatModel";
 import { TaskModels } from "./TaskModels";
 import { APIAgentForm, APIModelForm } from "./APIAgentForm";
 import { api } from "@neoread/api";
@@ -711,6 +712,7 @@ export function Settings({
     else openPiConfig(id);
     return false;
   };
+  const selectedReader = readingAgent(config);
   const projectForm = (id: string) =>
     config && (
       <AgentProjectForm
@@ -1494,9 +1496,22 @@ export function Settings({
               </div>
               {config && (
                 <div className="mt-4 flex flex-col gap-2">
-                  <div data-tour="task-models">
+                  {selectedReader && (
+                    <Button className="self-start" variant="outline" size="sm"
+                      onClick={() => selectedReader === "api" ? openAPIConfig() : openPiConfig(selectedReader)}>
+                      <Pencil /> 对话保存设置 · {providerLabel(selectedReader)}
+                    </Button>
+                  )}
+                  <div className="grid gap-2" data-tour="task-models">
+                    {isNativeAgent(selectedReader) && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-10 shrink-0 text-sm">问答</span>
+                        <NativeChatModel key={selectedReader} provider={selectedReader} disabled={saving} discover={open} />
+                      </div>
+                    )}
                     <TaskModels
                       disabled={saving || testing.size > 0}
+                      backgroundOnly={isNativeAgent(selectedReader)}
                       refreshKey={modelRefresh}
                       onAPIModelsLoaded={setAPIModels}
                     />

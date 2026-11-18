@@ -627,3 +627,23 @@ it("opens native project settings inside the existing deck and selects the same 
  expect(useReaderStore.getState().aiConfig?.nativeAgent?.provider).toBe("native:codex");
  expect(vi.mocked(api.testAI).mock.calls.some(([p])=>p==="native:codex")).toBe(false);
 });
+
+
+it("scopes the reader model and project shortcut to the active CLI while retaining background models", async () => {
+  config.primary = "api";
+  config.models = { api: "background-chat", "native:codex": "codex-choice", "native:antigravity": "agy-choice" };
+  config.nativeAgent = { provider: "native:codex", projectName: "Reading", directory: "", executables: {} };
+  await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
+  expect(host.querySelector('[aria-label="Codex 问答模型"]')?.textContent).toContain("codex-choice");
+  expect(host.querySelector('[aria-label="问答模型"]')).toBeNull();
+  expect(host.querySelector('[aria-label="翻译模型"]')).not.toBeNull();
+  const shortcut = Array.from(host.querySelectorAll("button")).find((b) => b.textContent?.includes("对话保存设置 · Codex"));
+  await act(async () => shortcut!.click());
+  expect(host.querySelector('form[aria-label="Codex 项目对话"]')).not.toBeNull();
+  await act(async () => {
+    config = { ...config, nativeAgent: { ...config.nativeAgent!, provider: "native:antigravity" } };
+    useReaderStore.getState().setAIConfig(config);
+  });
+  expect(host.querySelector('[aria-label="Antigravity 问答模型"]')?.textContent).toContain("agy-choice");
+  expect(host.querySelector('[aria-label="Codex 问答模型"]')).toBeNull();
+});

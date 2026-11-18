@@ -1,5 +1,4 @@
 import { ChatMeters } from "./ChatMeters";
-import { providerLabel } from "./ProviderIdentity";
 import { useAnnotationUpdates } from "./useAnnotationUpdates";
 import { webSearchEnabled } from "./chat/web-search";
 import { NavigationTree } from "./NavigationTree";
@@ -101,6 +100,7 @@ import {
 } from "@neoread/ui/components/tooltip";
 import { toast } from "sonner";
 import { DocumentOverviewDialog } from "./DocumentOverview";
+import { NativeChatModel } from "./NativeChatModel";
 import { ModelSelector } from "./ModelSelector";
 import { SourceReferences } from "./SourceReferences";
 import { ChatSession } from "./chat/chat-session";
@@ -1768,9 +1768,12 @@ export function Workspace({
                   />
                   <div className="compose-footer">
                     {native ? (
-                      <Button variant="ghost" size="sm" onClick={onSettings}>
-                        {providerLabel(provider)}
-                      </Button>
+                      <NativeChatModel
+                        key={provider}
+                        provider={provider}
+                        disabled={sending || !currentSession}
+                        lastModel={[...chat.messages].reverse().find((message) => message.usage?.provider === provider && message.usage.model)?.usage?.model}
+                      />
                     ) : (
                       <ModelSelector key={provider} disabled={sending || !currentSession} onSettings={onSettings} />
                     )}
@@ -1780,6 +1783,7 @@ export function Workspace({
                         provider={provider}
                         messages={chat.messages}
                         connectionKey={aiConfig?.nativeAgent?.executables[provider] || ""}
+                        selectedModel={aiConfig?.models[provider]}
                         active={right && rightTab === "ai"}
                         onNewChat={sending ? undefined : async () => {
                           try {

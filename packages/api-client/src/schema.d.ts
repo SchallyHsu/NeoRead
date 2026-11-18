@@ -3223,7 +3223,7 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    provider: "codex" | "claude" | "kimi" | "api";
+                    provider: "codex" | "claude" | "kimi" | "api" | "native:codex" | "native:claude-code" | "native:antigravity" | "native:deepseek-harness";
                     /** @description Reload an expired catalog from the Settings picker. Fresh snapshots are reused. */
                     refresh?: boolean;
                     /** @description Read the existing snapshot, including expired data, without starting discovery. */

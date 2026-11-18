@@ -1,5 +1,7 @@
 import { readAccountUsage } from "./zotero/agent/account-usage";
 import { createInterface } from "node:readline";
+import { homedir } from "node:os";
+import path from "node:path";
 import { mkdir, realpath } from "node:fs/promises";
 import { AcpClient } from "./zotero/agent/acp";
 import { AcpAgentSession } from "./zotero/agent/session";
@@ -84,8 +86,9 @@ lines.on("line", async (line) => {
     }
     const cli = await findCli(spawner, env, spec, r.executable);
     if (!cli) throw Error();
-    await mkdir(r.cwd, { recursive: true, mode: 0o700 });
-    const cwd = await realpath(r.cwd);
+    const catalog = operation === "native-catalog";
+    if (!catalog) await mkdir(r.cwd, { recursive: true, mode: 0o700 });
+    const cwd = catalog ? process.cwd() : await realpath(r.cwd);
     const node = process.execPath;
     let args = spec.directArgs ? [...spec.directArgs] : [];
     let command = cli,
@@ -93,7 +96,17 @@ lines.on("line", async (line) => {
       projectId = r.projectId || "",
       pending = "";
     const project = { cwd, projectName: r.projectName, title: r.title };
-    if (r.backend === "antigravity") {
+    if (catalog && r.backend === "antigravity") {
+      args.push(
+        "--gemini-dir",
+        path.resolve(
+          process.env.ZOTERO_AGENT_GEMINI_DIR ||
+            path.join(homedir(), ".gemini"),
+        ),
+        "--app-data-dir",
+        "antigravity",
+      );
+    } else if (r.backend === "antigravity") {
       try {
         const { prepareSession } = await helper(
           "antigravity-project-integration",
@@ -155,12 +168,32 @@ lines.on("line", async (line) => {
     session = await AcpAgentSession.open(client, spec, {
       backend: r.backend,
       cwd,
-      brief: "你在 NeoRead 阅读侧栏中回答问题。",
+      brief: catalog ? "" : "你在 NeoRead 阅读侧栏中回答问题。",
+      ephemeral: catalog,
       resumeSessionId: resume,
       freshNativeSession: !!resume && !r.resume,
     });
     if (stopping) throw Error();
     send({ type: "activity", phase: "native_ready" });
+    if (catalog) {
+      const current = session.currentModel();
+      const models = [...session.models()];
+      if (current && !models.some((model) => model.id === current)) {
+        models.unshift({ id: current, name: current });
+      }
+      send({
+        type: "complete",
+        models: models.map((model) => ({
+          ...model,
+          isDefault: model.id === current,
+        })),
+      });
+      return;
+    }
+    if (r.model && r.model !== session.currentModel()) {
+      phase = "model";
+      await session.setModel(r.model);
+    }
     phase = "answer";
     if (r.images?.length && !session.supportsImages) {
       phase = "images";

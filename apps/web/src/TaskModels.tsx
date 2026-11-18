@@ -24,7 +24,7 @@ import {
   selectedAgentModel,
 } from "./ModelSelector";
 import { useReaderStore } from "./store";
-import { ProviderIcon } from "./ProviderIdentity";
+import { ProviderIcon, providerLabel } from "./ProviderIdentity";
 
 const AUTO = "__auto__";
 const tasks: [ModelTask, string][] = [
@@ -50,9 +50,11 @@ export function TaskModels({
   disabled,
   onAPIModelsLoaded,
   refreshKey = 0,
+  backgroundOnly = false,
 }: {
   disabled: boolean;
   refreshKey?: number;
+  backgroundOnly?: boolean;
   onAPIModelsLoaded?: (models: AgentModel[]) => void;
 }) {
   const {
@@ -159,7 +161,8 @@ export function TaskModels({
     usableModels(provider, models, "vision").length === 0;
   return (
     <div className="flex flex-col gap-2">
-      {(provider === "api" ? apiTasks : tasks).map(([task, label]) => {
+      {backgroundOnly && <p className="text-xs text-muted-foreground">后台处理 · {providerLabel(provider)}</p>}
+      {(provider === "api" ? apiTasks : tasks).filter(([task]) => !backgroundOnly || task !== "chat").map(([task, label]) => {
         const { model, effort } = taskChoice(config, task);
         const usable = usableModels(provider, models, task);
         const recommended = selectedAgentModel(usable, "", task);

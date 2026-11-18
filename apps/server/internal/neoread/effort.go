@@ -3,10 +3,12 @@ package neoread
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 )
 
 const modelCatalogTTL = 24 * time.Hour
+const nativeCatalogTimeout = 2 * time.Minute
 
 type refreshModelCatalogKey struct{}
 type cachedModelsOnlyKey struct{}
@@ -58,7 +60,11 @@ func (s *Server) cachedCatalog(ctx context.Context, key string, discover func(co
 		s.modelLoads[key] = pending
 		// The discovery belongs to the shared cache, not to its first HTTP caller.
 		// Keep trace values, bound its lifetime, and cancel each wait independently.
-		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+		timeout := 20 * time.Second
+		if strings.HasPrefix(key, "native:") {
+			timeout = nativeCatalogTimeout
+		}
+		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 		go func() {
 			defer cancel()
 			started := time.Now()

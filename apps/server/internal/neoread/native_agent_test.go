@@ -21,7 +21,7 @@ func TestNativeReaderContinuation(t *testing.T) {
 		t.Fatal(err)
 	}
 	worker := filepath.Join(t.TempDir(), "worker.mjs")
-	err = os.WriteFile(worker, []byte(`import readline from 'node:readline'; const rl=readline.createInterface({input:process.stdin});rl.once('line',line=>{const {input:r}=JSON.parse(line);const send=e=>console.log(JSON.stringify({version:1,runId:r.runId,...e}));send({type:'delta',text:'ok'});send({type:'complete',id:r.resume||'first',text:r.resume?'resumed':'fresh',entries:'',code:'project',turnUsage:{inputTokens:14,outputTokens:5,contextUsed:70,contextSize:100}});rl.close();process.stdin.destroy()});`), 0600)
+	err = os.WriteFile(worker, []byte(`import readline from 'node:readline'; const rl=readline.createInterface({input:process.stdin});rl.once('line',line=>{const {input:r}=JSON.parse(line);if(r.model!=='test-model')process.exit(3);const send=e=>console.log(JSON.stringify({version:1,runId:r.runId,...e}));send({type:'delta',text:'ok'});send({type:'complete',id:r.resume||'first',text:r.resume?'resumed':'fresh',entries:'',code:'project',turnUsage:{inputTokens:14,outputTokens:5,contextUsed:70,contextSize:100}});rl.close();process.stdin.destroy()});`), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestNativeReaderContinuation(t *testing.T) {
 	chat := &chatInput{DocumentID: "doc", SessionID: sid, piRunID: id(), Question: "hello"}
 	run := func(want string) {
 		t.Helper()
-		got, err := s.nativeAnswer(context.Background(), cfg, AIInput{Chat: chat, Prompt: chat.legacyPrompt()}, func(ProviderEvent) error { return nil }, func(string) error { return nil })
+		got, err := s.nativeAnswer(context.Background(), cfg, "test-model", AIInput{Chat: chat, Prompt: chat.legacyPrompt()}, func(ProviderEvent) error { return nil }, func(string) error { return nil })
 		if err != nil || got.Text != want {
 			t.Fatalf("%+v %v", got, err)
 		}

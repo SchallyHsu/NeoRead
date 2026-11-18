@@ -120,18 +120,20 @@ export function ChatMeters({
   provider,
   connectionKey,
   messages,
+  selectedModel,
   active = true,
   onNewChat,
 }: {
   provider: string;
   connectionKey: string;
   messages: Message[];
+  selectedModel?: string;
   active?: boolean;
   onNewChat?: () => void;
 }) {
   const route =
     provider === "native:deepseek-harness"
-      ? [...messages]
+      ? selectedModel || [...messages]
           .reverse()
           .find((m) => m.usage?.provider === provider && m.usage.model)?.usage
           ?.model || ""
