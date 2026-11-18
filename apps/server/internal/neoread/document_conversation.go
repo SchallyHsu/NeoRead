@@ -12,6 +12,7 @@ import (
 // One logical conversation per document and provider. Pi entries hold the continuation.
 // The UI transcript and per-turn protocol events remain in messages/agent_runs.
 type documentConversation struct {
+	ProjectNotice   string                  `json:"projectNotice,omitempty"`
 	NativeID        string                  `json:"nativeId,omitempty"`
 	NativeProjectID string                  `json:"nativeProjectId,omitempty"`
 	PiEntries       json.RawMessage         `json:"piEntries,omitempty"`

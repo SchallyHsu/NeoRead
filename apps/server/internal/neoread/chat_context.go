@@ -86,7 +86,20 @@ func (s *Store) chatHistory(documentID string, session ...string) ([]Message, er
 		query += " AND COALESCE(json_extract(body,'$.sessionId'),'')=?"
 		args = append(args, session[0])
 	}
-	rows, err := s.DB.Query(query+" ORDER BY rowid DESC", args...)
+	order := " ORDER BY rowid DESC"
+	var ordered bool
+	check := "SELECT EXISTS(SELECT 1 FROM dav_order o JOIN messages m ON m.id=o.message_id WHERE m.document_id=?"
+	if len(session) > 0 {
+		check += " AND json_extract(m.body,'$.sessionId')=?"
+	}
+	if err := s.DB.QueryRow(check+")", args...).Scan(&ordered); err != nil {
+		return nil, err
+	}
+	if ordered {
+		query = strings.Replace(query, "FROM messages WHERE", "FROM messages LEFT JOIN dav_order o ON o.message_id=messages.id WHERE", 1)
+		order = " ORDER BY (o.message_id IS NULL) DESC, CASE WHEN o.message_id IS NULL THEN messages.rowid END DESC, o.question_at DESC, o.question_id DESC, o.ordinal DESC, messages.rowid DESC"
+	}
+	rows, err := s.DB.Query(query+order, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -194,10 +194,15 @@ export type PaperRefreshProgress =
 export type ChapterTranslationStatus =
   paths["/api/documents/{id}/translations/chapter-status"]["post"]["responses"]["200"]["content"]["application/json"];
 
+export interface WebDAVConfig { enabled:boolean; url:string; username:string; }
+export interface WebDAVStatus {at?:string;error?:string;uploaded:number;downloaded:number}
 export interface NativeAgentSettings {
   provider:string; projectName:string; directory:string; executables:Record<string,string>;
 }
 export const api = {
+ webdav:()=>request<WebDAVConfig & {status:WebDAVStatus}>("/api/webdav"),
+ saveWebdav:(cfg:WebDAVConfig,password:string)=>request<WebDAVConfig & {status:WebDAVStatus}>("/api/webdav",{method:"PUT",body:JSON.stringify({...cfg,password})}),
+ syncWebdav:()=>request<WebDAVStatus>("/api/webdav/sync",{method:"POST"}),
   nativeAgent:()=>request<NativeAgentSettings>("/api/native-agent"),
   saveNativeAgent:(config:NativeAgentSettings)=>request<NativeAgentSettings>("/api/native-agent",{method:"PUT",body:JSON.stringify(config)}),
   paperRefreshStatus: () =>

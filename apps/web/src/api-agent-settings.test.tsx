@@ -454,7 +454,7 @@ it.each(["text", "vision"] as const)(
   },
 );
 
-it("shows only library location in the books tab for the current library", async () => {
+it("shows library location and cross-device sync in the books tab", async () => {
   const previous = useReaderStore.getState().libraryPreferences;
   libraryPanel.visible = true;
   useReaderStore.setState({
@@ -479,7 +479,8 @@ it("shows only library location in the books tab for the current library", async
     )!;
     expect(panel.textContent).toContain("书库位置");
     expect(panel.textContent).toContain("/test/library");
-    expect(panel.querySelectorAll("section")).toHaveLength(1);
+    expect(panel.textContent).toContain("跨设备同步");
+    expect(panel.querySelectorAll("section")).toHaveLength(2);
     expect(panel.textContent).not.toContain("导入设置");
     expect(panel.textContent).not.toContain("论文显示作者名字");
   } finally {

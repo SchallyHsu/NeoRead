@@ -11,13 +11,15 @@ import (
 )
 
 type ChatSession struct {
-	ID         string   `json:"id"`
-	DocumentID string   `json:"documentId"`
-	Title      string   `json:"title"`
-	Provider   string   `json:"provider"`
-	CreatedAt  string   `json:"createdAt"`
-	UpdatedAt  string   `json:"updatedAt"`
-	LatestRun  *ChatRun `json:"latestRun,omitempty"`
+	ProjectNotice  string   `json:"projectNotice,omitempty"`
+	SyncedMessages int      `json:"syncedMessages,omitempty"`
+	ID             string   `json:"id"`
+	DocumentID     string   `json:"documentId"`
+	Title          string   `json:"title"`
+	Provider       string   `json:"provider"`
+	CreatedAt      string   `json:"createdAt"`
+	UpdatedAt      string   `json:"updatedAt"`
+	LatestRun      *ChatRun `json:"latestRun,omitempty"`
 }
 
 // Migrate in a single transaction. IDs, evidence, reading positions and annotation
@@ -87,7 +89,7 @@ func (s *Server) listChatSessions(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "无法迁移会话历史")
 		return
 	}
-	rows, err := s.Store.DB.Query("SELECT id,document_id,title,provider,created_at,updated_at FROM chat_sessions WHERE document_id=? ORDER BY rowid", doc.ID)
+	rows, err := s.Store.DB.Query("SELECT id,document_id,title,provider,created_at,updated_at,(SELECT COUNT(*) FROM messages m JOIN dav_order o ON o.message_id=m.id WHERE m.document_id=chat_sessions.document_id AND json_extract(m.body,'$.sessionId')=chat_sessions.id) FROM chat_sessions WHERE document_id=? ORDER BY rowid", doc.ID)
 	if err != nil {
 		fail(w, 500, "无法读取会话")
 		return
@@ -95,7 +97,7 @@ func (s *Server) listChatSessions(w http.ResponseWriter, r *http.Request) {
 	sessions := []ChatSession{}
 	for rows.Next() {
 		var v ChatSession
-		if err = rows.Scan(&v.ID, &v.DocumentID, &v.Title, &v.Provider, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err = rows.Scan(&v.ID, &v.DocumentID, &v.Title, &v.Provider, &v.CreatedAt, &v.UpdatedAt, &v.SyncedMessages); err != nil {
 			break
 		}
 		sessions = append(sessions, v)
@@ -107,6 +109,14 @@ func (s *Server) listChatSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range sessions {
+		v := &sessions[i]
+		if nativeProvider(v.Provider) {
+			err := s.Store.DB.QueryRow("SELECT COALESCE(json_extract(body,'$.projectNotice'),'') FROM document_conversations WHERE document_id=? AND provider=?", v.DocumentID, conversationProvider(v.ID, v.Provider)).Scan(&v.ProjectNotice)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				fail(w, 500, "无法读取原生项目登记状态")
+				return
+			}
+		}
 		run, err := s.Store.latestChatRun(sessions[i].ID)
 		if err == nil {
 			sessions[i].LatestRun = &run

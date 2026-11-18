@@ -124,6 +124,7 @@ lines.on("line", async (line) => {
       spawner,
       command,
       args,
+      initTimeoutMs: 90_000,
       cwd,
       env: childEnv,
     });
@@ -135,6 +136,7 @@ lines.on("line", async (line) => {
       freshNativeSession: !!resume && !r.resume,
     });
     if (stopping) throw Error();
+    send({ type: "activity", phase: "native_ready" });
     phase = "answer";
     if (r.images?.length && !session.supportsImages) {
       phase = "images";

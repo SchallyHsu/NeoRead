@@ -25,6 +25,7 @@ import { LegacyAnnotationMigration } from "./LegacyAnnotationMigration";
 import { DiagnosticExport } from "./DiagnosticExport";
 import { PaperRefreshSettings } from "./PaperRefreshSettings";
 import { NativeAgentSettingsPanel } from "./NativeAgentSettings";
+import { WebDAVSettings } from "./WebDAVSettings";
 import { LibraryLocationSettings } from "./LibraryLocationSettings";
 import { CommandLineSettings } from "./CommandLineSettings";
 import { ProviderIcon, providerLabel } from "./ProviderIdentity";
@@ -991,6 +992,7 @@ export function Settings({
             {window.neoreadDesktop?.libraryLocation && (
               <LibraryLocationSettings open={open} />
             )}
+            <WebDAVSettings open={open} />
             {currentLibrary === "papers" && (
               <>
                 <CitePluginSettings open={open} />

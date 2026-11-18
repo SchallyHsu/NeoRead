@@ -498,6 +498,10 @@ export function Workspace({
     ? getChatSession(doc.id, currentSession.id)
     : emptySession;
   const chat = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const syncedMessages = currentSession?.syncedMessages;
+  useEffect(() => {
+    if (syncedMessages && !session.getSnapshot().busy) void session.load();
+  }, [syncedMessages, session]);
   useEffect(() => {
     if (
       !currentSession ||
@@ -1623,6 +1627,7 @@ export function Workspace({
                   onChange={selectSession}
                   onRefresh={refreshSessions}
                 />
+                {currentSession?.projectNotice && <p role="status" className="px-3 text-xs text-muted-foreground">{currentSession.projectNotice}</p>}
                 {sessionError && (
                   <div
                     className="px-3 py-2 text-sm text-destructive"

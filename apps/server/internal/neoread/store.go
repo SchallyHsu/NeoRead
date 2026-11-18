@@ -135,6 +135,13 @@ func OpenStore(root string) (*Store, error) {
  CREATE TABLE IF NOT EXISTS chat_sessions(id TEXT PRIMARY KEY,document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,title TEXT NOT NULL,provider TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
  CREATE INDEX IF NOT EXISTS chat_sessions_document ON chat_sessions(document_id);
  CREATE INDEX IF NOT EXISTS messages_session ON messages(document_id,json_extract(body,'$.sessionId'));
+ CREATE TABLE IF NOT EXISTS dav_files(hash TEXT PRIMARY KEY, document_id TEXT NOT NULL);
+ CREATE INDEX IF NOT EXISTS dav_file_document ON dav_files(document_id);
+ CREATE INDEX IF NOT EXISTS chat_message_session ON messages(document_id,json_extract(body,'$.sessionId'));
+ CREATE TABLE IF NOT EXISTS dav_received(endpoint TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(endpoint,name));
+ CREATE TABLE IF NOT EXISTS dav_hidden(session_id TEXT PRIMARY KEY);
+ CREATE TRIGGER IF NOT EXISTS dav_hide_session AFTER DELETE ON chat_sessions BEGIN INSERT OR IGNORE INTO dav_hidden VALUES(OLD.id);END;
+ CREATE TABLE IF NOT EXISTS dav_order(message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,question_at TEXT NOT NULL,question_id TEXT NOT NULL,ordinal INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS chat_runs(id TEXT PRIMARY KEY,session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,body TEXT NOT NULL);
  CREATE INDEX IF NOT EXISTS chat_runs_session ON chat_runs(session_id);
  CREATE TABLE IF NOT EXISTS chat_agent_runs(id TEXT PRIMARY KEY,document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,body TEXT NOT NULL);`)

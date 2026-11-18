@@ -30,6 +30,10 @@ import (
 )
 
 type Server struct {
+	nativeStartup          [2]sync.Mutex
+	davMu                  sync.Mutex
+	davStatusMu            sync.Mutex
+	davLast                davStatus
 	startupSettings        json.RawMessage
 	processingReady        <-chan struct{}
 	chatReservations       map[string]bool
@@ -222,6 +226,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/documents/{id}/messages", s.messages)
 	mux.HandleFunc("GET /api/documents/{id}/messages/{message}/sources/{source}", s.validateChatEvidence)
 	mux.HandleFunc("POST /api/documents/{id}/chat", s.chat)
+	mux.HandleFunc("GET /api/webdav", s.davSettings)
+	mux.HandleFunc("PUT /api/webdav", s.davSettings)
+	mux.HandleFunc("POST /api/webdav/sync", s.davNow)
 	mux.HandleFunc("GET /api/native-agent", s.nativeConfig)
 	mux.HandleFunc("PUT /api/native-agent", s.nativeConfig)
 	mux.HandleFunc("GET /api/documents/{id}/chat-sessions", s.listChatSessions)

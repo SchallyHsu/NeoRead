@@ -4,6 +4,132 @@
  */
 
 export interface paths {
+    "/api/webdav": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read WebDAV settings */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description WebDAV settings and last result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            url?: string;
+                            enabled?: boolean;
+                            username?: string;
+                            status?: {
+                                at?: string;
+                                error?: string;
+                                uploaded?: number;
+                                downloaded?: number;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        /** Configure WebDAV and store password in system keyring */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        url?: string;
+                        enabled?: boolean;
+                        username?: string;
+                        password?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description WebDAV settings and last result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            url?: string;
+                            enabled?: boolean;
+                            username?: string;
+                            status?: {
+                                at?: string;
+                                error?: string;
+                                uploaded?: number;
+                                downloaded?: number;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webdav/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange portable documents and chat turns */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Sync result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            at?: string;
+                            error?: string;
+                            uploaded?: number;
+                            downloaded?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/native-agent": {
         parameters: {
             query?: never;

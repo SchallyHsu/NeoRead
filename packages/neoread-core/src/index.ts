@@ -979,6 +979,8 @@ export interface ChatRun {
   finishedAt?: string;
 }
 export interface DocumentChatSession {
+  syncedMessages?: number;
+  projectNotice?: string;
   id: string;
   documentId: string;
   title: string;

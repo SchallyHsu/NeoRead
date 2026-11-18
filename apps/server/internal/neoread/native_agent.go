@@ -66,7 +66,11 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInpu
 	chat := in.Chat
 	cwd := cfg.Directory
 	if cwd == "" {
-		cwd = filepath.Join(s.Store.Root, "agent-projects", sourceKey(cfg.ProjectName)[:16])
+		folder := cfg.ProjectName
+		if !filepath.IsLocal(folder) || folder == "." || strings.ContainsAny(folder, `/\\<>:"|?*`) || strings.HasSuffix(folder, ".") || strings.HasSuffix(folder, " ") {
+			folder = "project-" + sourceKey(folder)[:16]
+		}
+		cwd = filepath.Join(s.Store.Root, "agent-projects", folder)
 	}
 	key := sourceKey(cwd + "\x00" + cfg.ProjectName)
 	c, err := s.Store.documentConversation(ctx, chat.DocumentID, conversationProvider(chat.SessionID, cfg.Provider), key)
@@ -91,8 +95,32 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInpu
 	}
 	backend := strings.TrimPrefix(cfg.Provider, "native:")
 	req := map[string]any{"runId": chat.piRunID, "backend": backend, "cwd": cwd, "projectName": cfg.ProjectName, "title": session.Title, "resume": c.NativeID, "projectId": c.NativeProjectID, "prompt": prompt, "images": images, "executable": cfg.Executables[cfg.Provider], "bridgeDir": filepath.Join(s.Store.Root, "native-bridges", backend)}
+	// Each worker has its own JS runtime. Serialize startup for a shared npm
+	// prefix until the worker has loaded its bridge, then allow parallel turns.
+	var release = func() {}
+	if backend == "codex" || backend == "claude-code" {
+		slot := 0
+		if backend == "claude-code" {
+			slot = 1
+		}
+		lock := &s.nativeStartup[slot]
+		lock.Lock()
+		released := false
+		release = func() {
+			if !released {
+				released = true
+				lock.Unlock()
+			}
+		}
+		defer release()
+		if err := ctx.Err(); err != nil {
+			return AIResult{}, err
+		}
+	}
 	done, err := runPiOperation(ctx, s.Store.Root, "native", chat.piRunID, req, false, func(e piEvent) error {
 		switch e.Type {
+		case "activity":
+			release()
 		case "delta":
 			return emit(ProviderEvent{Text: e.Text})
 		case "reasoning":
@@ -112,6 +140,7 @@ func (s *Server) nativeAnswer(ctx context.Context, cfg nativeSettings, in AIInpu
 	}
 	c.NativeID = done.ID
 	c.NativeProjectID = done.Code
+	c.ProjectNotice = done.Message
 	if c.SeenSources == nil {
 		c.SeenSources = map[string]bool{}
 	}
